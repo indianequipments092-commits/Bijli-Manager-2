@@ -85,9 +85,12 @@ nav button.on:not(.g){color:var(--am);background:color-mix(in srgb,var(--am) 14%
 <header><h1>⚡ Bijli Manager <b>Pro</b></h1><button class="g" style="color:#fff;border-color:#ffffff55" onclick="cycleTheme()">Theme</button></header>
 <div id="bkn"></div><main id="v"></main><nav id="nav"></nav><dialog id="dg"></dialog><div id="pr"></div>
 <script>
-const NAT=()=>!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
-async function nativeShare(name,data,isText){const FS=Capacitor.registerPlugin('Filesystem'),SH=Capacitor.registerPlugin('Share');const o={path:name,data:data,directory:'CACHE'};if(isText)o.encoding='utf8';const w=await FS.writeFile(o);await SH.share({title:name,url:w.uri,dialogTitle:name})}
-try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')}catch(x){}
+const NAT=()=>{try{const C=window.Capacitor;return !!(window.androidBridge||(C&&((C.isNativePlatform&&C.isNativePlatform())||(C.getPlatform&&C.getPlatform()!=='web'))))}catch(x){return false}};
+const CP=n=>{const C=window.Capacitor;if(C&&C.Plugins&&C.Plugins[n])return C.Plugins[n];if(C&&C.registerPlugin)return C.registerPlugin(n);throw new Error(n+' plugin not available')};
+const b64=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(b)});
+const dbg=()=>{const C=window.Capacitor;return 'nat='+NAT()+' cap='+!!C+' bridge='+!!window.androidBridge+' plat='+(C&&C.getPlatform?C.getPlatform():'-')};
+async function nativeShare(name,data,isText){const FS=CP('Filesystem'),SH=CP('Share');const o={path:name,data:data,directory:'CACHE'};if(isText)o.encoding='utf8';const w=await FS.writeFile(o);await SH.share({title:name,url:w.uri,dialogTitle:name})}
+async function nativeSave(name,d64){const FS=CP('Filesystem');try{if(FS.requestPermissions)await FS.requestPermissions()}catch(x){}const w=await FS.writeFile({path:'BijliManager/'+name,data:d64,directory:'DOCUMENTS',recursive:true});return w.uri}
 const K='bijli_pro_v1';let S=null;
 try{S=JSON.parse(localStorage.getItem(K))}catch(x){}
 S=S||{meters:[],cycles:[],cur:'₹',theme:'auto'};
@@ -323,8 +326,12 @@ wrap.forEach((t,i)=>P.text((t.startsWith('   ')?'   ':'-  ')+t.trim(),50,y+33+i*
 /* footer */
 P.line(36,800,559,BR);P.text('Generated '+today+'  |  Bijli Manager Pro',36,816,8,MU);P.line(420,808,559,'#9aa7ad');P.text('Authorised signature',559,820,8,MU,0,'r');
 deliver(P.build(),'Bill-'+cl(m.name,14).replace(/\W+/g,'_')+'-'+lbl(c).replace(/\W+/g,'_')+'.pdf')}
-async function deliver(b,n){const u=URL.createObjectURL(b);try{if(NAT()){const d64=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(b)});await nativeShare(n,d64,false);return}const f=new File([b],n,{type:'application/pdf'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:n});return}}catch(x){if(x&&x.name=='AbortError')return}
-const d=$('#dg');d.innerHTML=`<form method="dialog"><h3>PDF ready</h3><p><a href="${u}" download="${n}" target="_blank" rel="noopener"><button type="button">Download PDF</button></a></p><p class="mu">${e(n)}</p><div class="row"><button class="g" value="x">Close</button></div></form>`;d.returnValue='';d.onclose=null;d.showModal()}
+function deliver(b,n){const u=URL.createObjectURL(b),d=$('#dg');
+d.innerHTML=`<form method="dialog"><h3>PDF ready</h3><p class="mu">${e(n)}</p><div class="row"><button type="button" id="pdS">Share PDF</button><button type="button" id="pdD">Download PDF</button></div><p class="mu" id="pdM"></p><div class="row"><button class="g" value="x">Close</button></div></form>`;
+const msg=t=>{d.querySelector('#pdM').textContent=t};
+d.querySelector('#pdS').onclick=async()=>{try{if(NAT()){await nativeShare(n,await b64(b),false);return}const f=new File([b],n,{type:'application/pdf'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:n});return}msg('Share is not supported on this device. Use Download PDF.')}catch(x){if(x&&x.name=='AbortError')return;msg('Share failed: '+((x&&x.message)||x)+' ['+dbg()+']')}};
+d.querySelector('#pdD').onclick=async()=>{try{if(NAT()){await nativeSave(n,await b64(b));msg('Saved in Documents/BijliManager/'+n);return}const l=document.createElement('a');l.href=u;l.download=n;document.body.appendChild(l);l.click();l.remove();msg('Download started')}catch(x){msg('Download failed: '+((x&&x.message)||x)+' ['+dbg()+'] - try Share PDF')}};
+d.returnValue='';d.onclose=null;d.showModal()}
 function pdf(id){issueChk();if(id)return billPdf(id);const c=cur(),k=calc(c),tot=k.mu*k.rate,x=id&&k.R[id],P=PDF(),R=n=>'Rs. '+f(n),cl=(t,n)=>String(t).slice(0,n);let y=0;
 const np=()=>{P.add();y=50},row=(r,w,h)=>{if(y>800)np();if(h)P.rect(36,y-11,523,18,'#e6f0ef');let q=36;r.forEach((t,i)=>{i?P.text(t,q+w[i]-6,y,9,'#102028',h,'r'):P.text(cl(t,28),q+6,y,9,'#102028',h);q+=w[i]});if(!h)P.line(36,y+6,559,'#e1e9e8');y+=18},
 tb=(t,h,rows,w)=>{if(y>740)np();P.text(t,36,y,11,'#0b3b42',1);P.rect(36,y+5,40,2,'#ffb020');y+=22;row(h,w,1);rows.forEach(r=>row(r,w,0));y+=16};
