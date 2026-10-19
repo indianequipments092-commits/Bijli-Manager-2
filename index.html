@@ -446,4 +446,4 @@ function delPay(ci,mi,i){if(confirm('Delete this payment?')){S.cycles.find(x=>x.
 const pdfM=(ci,mi)=>{const o=cid;cid=ci;pdf(mi);cid=o};
 S.meters=Array.isArray(S.meters)?S.meters:[];S.cycles=Array.isArray(S.cycles)?S.cycles:[];S=migrate(S);save();bkNote();
 theme();go();
-</script></body></html>
+</script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script></body></html>

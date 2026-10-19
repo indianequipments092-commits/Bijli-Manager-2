@@ -1,12 +1,10 @@
-// Network-first: online ho to hamesha latest index.html aati hai (auto-update),
-// offline ho to last saved copy chalti hai.
-const C = 'bijli-v2';
+// Offline-first + auto-update: cache se turant khulta hai (net ke bina bhi),
+// peeche se net pe latest file download karke cache update karta hai.
+const C = 'bijli-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(C).then(c => c.addAll(FILES)).catch(() => {})
-  );
+  e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).catch(() => {}));
   self.skipWaiting();
 });
 
@@ -21,12 +19,15 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request, { cache: 'no-store' })
-      .then(r => {
-        const copy = r.clone();
-        caches.open(C).then(c => c.put(e.request, copy)).catch(() => {});
+    caches.match(e.request, { ignoreSearch: true }).then(cached => {
+      const net = fetch(e.request, { cache: 'no-store' }).then(r => {
+        if (r && r.ok) {
+          const copy = r.clone();
+          caches.open(C).then(c => c.put(e.request, copy)).catch(() => {});
+        }
         return r;
-      })
-      .catch(() => caches.match(e.request).then(m => m || caches.match('index.html')))
+      }).catch(() => cached || caches.match('index.html'));
+      return cached || net;
+    })
   );
 });
