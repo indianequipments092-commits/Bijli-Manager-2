@@ -1222,7 +1222,22 @@ const SPL=[['hi-IN','Hindi'],['en-IN','English (India)'],['en-US','English (US)'
 const TLG=[['en','English'],['hi','Hindi'],['ur','Urdu'],['bn','Bengali'],['ta','Tamil'],['te','Telugu'],['mr','Marathi'],['gu','Gujarati'],['pa','Punjabi'],['kn','Kannada'],['ml','Malayalam'],['ne','Nepali'],['ar','Arabic'],['fr','French'],['es','Spanish'],['de','German'],['pt','Portuguese'],['ru','Russian'],['zh-CN','Chinese'],['ja','Japanese']];
 const stMsg=(h,w)=>{const m=$('#st_m');if(m)m.innerHTML=h?`<p class="${w?'w':'mu'}">${h}</p>`:''};
 function stStop(){STON=0;if(STR){try{STR.onend=null;STR.onresult=null;STR.stop()}catch(x){}STR=null}const b=$('#st_b');if(b)b.textContent='🎤 Start speaking'}
-function stTog(){if(STON)return stStop();
+async function stNative(){
+const SR=CP('SpeechRecognition'),t=$('#st_t'),b=$('#st_b');
+const off=()=>{STON=0;b.textContent='🎤 Start speaking'};
+if(STON){try{await SR.stop()}catch(x){}off();return}
+try{
+const av=await SR.available();if(av&&av.available===false){stMsg('Is phone me speech engine (Google) nahi mila.',1);return}
+let p=await SR.checkPermissions();if(p.speechRecognition!=='granted')p=await SR.requestPermissions();
+if(p.speechRecognition!=='granted'){stMsg('Mic permission do: Settings > Apps > Bijli Manager > Permissions > Microphone',1);return}
+STF=t.value?t.value.replace(/\s*$/,' '):'';
+await SR.removeAllListeners();
+await SR.addListener('partialResults',d=>{if(d.matches&&d.matches[0]){t.value=STF+d.matches[0];t.scrollTop=t.scrollHeight}});
+await SR.addListener('listeningState',d=>{if(d.status==='stopped'){STF=t.value.replace(/\s*$/,' ');off()}});
+STON=1;b.textContent='⏹ Stop';stMsg('Listening… speak. (Internet must stay on)');
+await SR.start({language:$('#st_l').value,partialResults:true,popup:false,maxResults:1});
+}catch(x){off();stMsg('Error: '+e(x.message||x),1)}}
+function stTog(){if(NAT())return stNative();if(STON)return stStop();
 const SRC=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SRC){stMsg('This browser/app has no speech engine. Open it in the Chrome browser like a website.',1);return}
 const t=$('#st_t');STF=t.value?t.value.replace(/\s*$/,' '):'';const r=new SRC();r.lang=$('#st_l').value;r.continuous=true;r.interimResults=true;
 r.onresult=ev=>{let fn='',im='';for(let i=ev.resultIndex;i<ev.results.length;i++){const x=ev.results[i];if(x.isFinal)fn+=x[0].transcript;else im+=x[0].transcript}STF+=fn;t.value=STF+im;t.scrollTop=t.scrollHeight};
@@ -1898,7 +1913,16 @@ window.voGo=()=>{const s=$('#vo_t').value.trim(),o=$('#vo_o');if(!s)return;const
  if(!m.length){o.innerHTML='<p class="w">Samajh nahi aaya. Aise bolo: "pdf compress", "photo chhoti karo", "scan karo".</p>';return}
  o.innerHTML=`<div class="prc">${m.map(x=>`<button onclick="tOpen('${x[1]}')">${e(x[2])}</button>`).join('')}</div>`;
  if(m[0][0]>=4&&(m.length<2||m[0][0]-m[1][0]>=2)){o.insertAdjacentHTML('afterbegin',`<p class="mu">Khol raha hu: <b>${e(m[0][2])}</b></p>`);setTimeout(()=>{if(tl=='vo')tOpen(m[0][1])},1200)}};
-window.voListen=()=>{const SRC=window.SpeechRecognition||window.webkitSpeechRecognition,o=$('#vo_o');if(!SRC){o.innerHTML='<p class="w">Is browser/app me voice nahi chalta. Neeche likh kar bolo (Chrome me kholo to mic chalega).</p>';return}
+window.voNative=async()=>{const SR=CP('SpeechRecognition'),o=$('#vo_o');
+try{let p=await SR.checkPermissions();if(p.speechRecognition!=='granted')p=await SR.requestPermissions();
+if(p.speechRecognition!=='granted'){o.innerHTML='<p class="w">Mic permission do: Settings > Apps > Bijli Manager > Permissions > Microphone</p>';return}
+await SR.removeAllListeners();let last='';
+await SR.addListener('partialResults',d=>{if(d.matches&&d.matches[0]){last=d.matches[0];$('#vo_t').value=last}});
+await SR.addListener('listeningState',d=>{if(d.status==='stopped'){SR.removeAllListeners();if(last)voGo();else o.innerHTML='<p class="w">Kuch sunai nahi diya. Dobara bolo.</p>'}});
+o.innerHTML='<p class="mu"><i class="spin"></i>Sun raha hu… bolo</p>';
+await SR.start({language:$('#vo_l').value,partialResults:true,popup:false,maxResults:1});
+}catch(x){o.innerHTML='<p class="w">Mic nahi chala ('+e(x.message||x)+')</p>'}};
+window.voListen=()=>{if(NAT())return voNative();const SRC=window.SpeechRecognition||window.webkitSpeechRecognition,o=$('#vo_o');if(!SRC){o.innerHTML='<p class="w">Is browser/app me voice nahi chalta. Neeche likh kar bolo (Chrome me kholo to mic chalega).</p>';return}
  const r=new SRC();r.lang=$('#vo_l').value;r.interimResults=false;r.maxAlternatives=1;o.innerHTML='<p class="mu"><i class="spin"></i>Sun raha hu… bolo</p>';
  r.onresult=ev=>{$('#vo_t').value=ev.results[0][0].transcript;voGo()};r.onerror=ev=>{o.innerHTML='<p class="w">Mic nahi chala ('+e(ev.error)+'). Mic permission aur https check karo.</p>'};try{r.start()}catch(x){}};
 V.vo=['Voice command',()=>`<div class="grid"><label>Bhasha<select id="vo_l"><option value="hi-IN">Hindi</option><option value="en-IN">English</option></select></label></div><div class="row"><button onclick="voListen()">🎙️ Bolo</button></div><label>Ya yahan likho<input id="vo_t" placeholder="jaise: pdf compress karo" onkeydown="if(event.key=='Enter')voGo()"></label><div class="row"><button class="g" onclick="voGo()">Dhundo</button></div><div id="vo_o"></div><p class="mu">Tool ka naam ya kaam bolo, jaise "pdf jodo", "photo chhoti karo", "scan". Awaaz Google ke speech engine se samjhi jaati hai (internet chahiye).</p>`];
