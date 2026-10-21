@@ -1974,7 +1974,7 @@ function rbSegs(dk,w,h,hor,minLen,maxT){const A=hor?w:h,B=hor?h:w,res=[];let pre
  for(let j=0;j<B;j++){const cur=[];let s=-1,last=-1;
   let on_=0;
   for(let i=0;i<=A;i++){const on=i<A&&(hor?dk[j*w+i]:dk[i*w+j]);
-   if(on){if(s<0){s=i;on_=0}last=i;on_++}else if(s>=0&&(i>=A||i-last>1)){if(last-s+1>=minLen&&on_>=.92*(last-s+1))cur.push({a:s,b:last,p0:j,p1:j});s=-1}}
+   if(on){if(s<0){s=i;on_=0}last=i;on_++}else if(s>=0&&(i>=A||i-last>3)){if(last-s+1>=minLen&&on_>=.85*(last-s+1))cur.push({a:s,b:last,p0:j,p1:j});s=-1}}
   const np=[];
   cur.forEach(q=>{const m=prev.find(o=>Math.min(o.b,q.b)-Math.max(o.a,q.a)>=.6*Math.min(o.b-o.a,q.b-q.a));
    if(m){m.p1=j;m.a=Math.min(m.a,q.a);m.b=Math.max(m.b,q.b);np.push(m)}else{res.push(q);np.push(q)}});
@@ -1982,9 +1982,11 @@ function rbSegs(dk,w,h,hor,minLen,maxT){const A=hor?w:h,B=hor?h:w,res=[];let pre
  return res.filter(s=>s.p1-s.p0+1<=maxT).map(s=>({a:s.a,b:s.b,p:(s.p0+s.p1)/2,t:s.p1-s.p0+1}))}
 function rbCluster(a,tol){const s=a.slice().sort((x,y)=>x.p-y.p);let g=[];const flush=()=>{if(g.length){const m=g.reduce((t,q)=>t+q.p,0)/g.length;g.forEach(q=>q.p=m)}g=[]};
  s.forEach(q=>{if(g.length&&q.p-g[g.length-1].p>tol)flush();g.push(q)});flush()}
-function rbFindLines(dk,w,h){const minH=Math.max(30,Math.round(w*.04)),minV=Math.max(30,Math.round(h*.03)),maxT=10;
- const H=rbSegs(dk,w,h,true,minH,maxT),V=rbSegs(dk,w,h,false,minV,maxT);
- rbCluster(H,3);rbCluster(V,3);
+function rbMerge(arr,gap){const s=arr.slice().sort((x,y)=>x.p-y.p||x.a-y.a),o=[];s.forEach(q=>{const l=o[o.length-1];if(l&&Math.abs(l.p-q.p)<=1.6&&q.a-l.b<=gap){l.b=Math.max(l.b,q.b);l.t=Math.max(l.t,q.t)}else o.push({a:q.a,b:q.b,p:q.p,t:q.t})});return o}
+function rbCleanLines(L,WD){const keep=(s,hor)=>{let cov=0;WD.forEach(q=>{const qa=hor?q.x0:q.y0,qb=hor?q.x1:q.y1,pa=hor?q.y0:q.x0,pb=hor?q.y1:q.x1,m=(pb-pa)*.2;if(s.p>pa+m&&s.p<pb-m){const o=Math.min(qb,s.b)-Math.max(qa,s.a);if(o>0)cov+=o}});return cov<.35*(s.b-s.a)};L.h=L.h.filter(s=>keep(s,true));L.v=L.v.filter(s=>keep(s,false))}
+function rbFindLines(dk,w,h){const minH=Math.max(30,Math.round(w*.04)),minV=Math.max(30,Math.round(h*.03)),maxT=7;
+ let H=rbSegs(dk,w,h,true,minH,maxT),V=rbSegs(dk,w,h,false,minV,maxT);
+ rbCluster(H,4);rbCluster(V,4);H=rbMerge(H,14);V=rbMerge(V,14);
  const near=(arr,v,pa,pb,tol)=>{let b=null,bd=tol+1;arr.forEach(s=>{if(pa>=s.a-tol&&pa<=s.b+tol||pb>=s.a-tol&&pb<=s.b+tol||true){const d=Math.abs(s.p-v);if(d<bd){bd=d;b=s}}});return b&&bd<=tol?b.p:v};
  H.forEach(s=>{if(V.length){const l=V.filter(v=>s.p>=v.a-8&&s.p<=v.b+8);if(l.length){s.a=near(l,s.a,0,0,8);s.b=near(l,s.b,0,0,8)}}});
  V.forEach(s=>{if(H.length){const l=H.filter(v=>s.p>=v.a-8&&s.p<=v.b+8);if(l.length){s.a=near(l,s.a,0,0,8);s.b=near(l,s.b,0,0,8)}}});
@@ -2016,13 +2018,15 @@ AS.pdf.push('rb');AS.img.push('rb');NX.img.push('rb');VOA.rb='rebuild exact clea
 const RBFK=()=>lj('https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js','fontkit');
 const RBHI='https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-400-normal.woff';
 function rbSkew(c){const s=Math.min(1,700/Math.max(c.width,c.height)),w=Math.max(20,Math.round(c.width*s)),h=Math.max(20,Math.round(c.height*s)),g=cv(w,h),x=g.getContext('2d');x.drawImage(c,0,0,w,h);
- const sc=cv(w,h),sx=sc.getContext('2d');let best=0,bv=-1;
- for(let a=-5;a<=5.01;a+=.5){sx.fillStyle='#fff';sx.fillRect(0,0,w,h);sx.save();sx.translate(w/2,h/2);sx.rotate(a*Math.PI/180);sx.drawImage(g,-w/2,-h/2);sx.restore();
+ const sc=cv(w,h),sx=sc.getContext('2d');
+ const score=a=>{sx.fillStyle='#fff';sx.fillRect(0,0,w,h);sx.save();sx.translate(w/2,h/2);sx.rotate(a*Math.PI/180);sx.drawImage(g,-w/2,-h/2);sx.restore();
   const d=sx.getImageData(0,0,w,h).data,rows=new Float64Array(h);for(let yy=0;yy<h;yy++){let t=0;for(let xx=0;xx<w;xx++){const i=(yy*w+xx)*4;if(d[i]*.3+d[i+1]*.59+d[i+2]*.11<140)t++}rows[yy]=t}
-  let m=0;for(let i=0;i<h;i++)m+=rows[i];m/=h;let v=0;for(let i=0;i<h;i++)v+=(rows[i]-m)*(rows[i]-m);if(v>bv){bv=v;best=a}}
+  let m=0;for(let i=0;i<h;i++)m+=rows[i];m/=h;let v=0;for(let i=0;i<h;i++)v+=(rows[i]-m)*(rows[i]-m);return v};
+ let best=0,bv=-1;for(let a=-15;a<=15.01;a+=1){const v=score(a);if(v>bv){bv=v;best=a}}
+ const b0=best;for(let a=b0-1;a<=b0+1.01;a+=.25){const v=score(a);if(v>bv){bv=v;best=a}}
  return best}
-function rbRot(c,a){const o=cv(c.width,c.height),x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,o.width,o.height);x.translate(o.width/2,o.height/2);x.rotate(a*Math.PI/180);x.drawImage(c,-c.width/2,-c.height/2);return o}
-function rbClean(c){const o=cv(c.width,c.height),x=o.getContext('2d');try{x.filter='grayscale(1) contrast(1.35)'}catch(z){}x.drawImage(c,0,0);return o}
+function rbRot(c,a){const r=a*Math.PI/180,s=Math.abs(Math.sin(r)),k=Math.abs(Math.cos(r)),W=Math.ceil(c.width*k+c.height*s),Hh=Math.ceil(c.width*s+c.height*k),o=cv(W,Hh),x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,Hh);x.translate(W/2,Hh/2);x.rotate(r);x.drawImage(c,-c.width/2,-c.height/2);return o}
+function rbClean(c){const o=cv(c.width,c.height),x=o.getContext('2d');x.drawImage(c,0,0);const im=x.getImageData(0,0,o.width,o.height),d=im.data;for(let i=0;i<d.length;i+=4){let l=d[i]*.3+d[i+1]*.59+d[i+2]*.11;l=(l-128)*1.35+128;l=l<0?0:l>255?255:l;d[i]=d[i+1]=d[i+2]=l}x.putImageData(im,0,0);return o}
 const rbMed=a=>{const s=a.slice().sort((p,q)=>p-q);return s[s.length>>1]};
 function rbLines(ws){if(!ws.length)return[];const mh=rbMed(ws.map(w=>w.y1-w.y0))||10,s=ws.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),L=[];
  s.forEach(w=>{const cy=(w.y0+w.y1)/2,r=L[L.length-1];if(r&&Math.abs(cy-r.cy)<mh*.6){r.w.push(w);r.cy=(r.cy*(r.w.length-1)+cy)/r.w.length}else L.push({cy,w:[w]})});
@@ -2033,52 +2037,115 @@ function rbInk(c){const w=c.width,h=c.height,d=c.getContext('2d').getImageData(0
  for(let i=0,p=0;i<n;i++,p+=4){const r=d[p],g=d[p+1],b=d[p+2],l=(r*.3+g*.59+b*.11)|0;lum[i]=l;hist[l]++;sat[i]=Math.max(r,g,b)-Math.min(r,g,b)}
  let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let wB=0,sB=0,mx=0,th=128;
  for(let t=0;t<256;t++){wB+=hist[t];if(!wB)continue;const wF=n-wB;if(!wF)break;sB+=t*hist[t];const mB=sB/wB,mF=(sum-sB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>mx){mx=v;th=t}}
- th=Math.max(110,Math.min(190,th));const dark=new Uint8Array(n),any=new Uint8Array(n);
- for(let i=0;i<n;i++){if(lum[i]<th){dark[i]=1;any[i]=1}else if(sat[i]>60&&lum[i]<235)any[i]=1}
- return{dark,any,w,h}}
+ th=Math.max(110,Math.min(190,th));const dark=new Uint8Array(n),any=new Uint8Array(n),lin=new Uint8Array(n),lt=Math.min(225,th+35);
+ for(let i=0;i<n;i++){if(lum[i]<th){dark[i]=1;any[i]=1}else if(sat[i]>60&&lum[i]<235)any[i]=1;if(lum[i]<lt)lin[i]=1}
+ return{dark,any,lin,w,h,d}}
 /* crop a region from the original and paint over OCR words inside it (they are redrawn as real text) */
-async function rbCrop(c,b,WD){const o=cv(b.w,b.h),x=o.getContext('2d');x.drawImage(c,b.x,b.y,b.w,b.h,0,0,b.w,b.h);const id=x.getImageData(0,0,b.w,b.h).data;
+async function rbCrop(c,b,WD,LN){const o=cv(b.w,b.h),x=o.getContext('2d');x.drawImage(c,b.x,b.y,b.w,b.h,0,0,b.w,b.h);const id=x.getImageData(0,0,b.w,b.h).data;
  const px=(X,Y)=>{X=Math.max(0,Math.min(b.w-1,X|0));Y=Math.max(0,Math.min(b.h-1,Y|0));const i=(Y*b.w+X)*4;return`rgb(${id[i]},${id[i+1]},${id[i+2]})`};
  WD.forEach(q=>{const cx=(q.x0+q.x1)/2,cy=(q.y0+q.y1)/2;if(cx<b.x||cx>b.x+b.w||cy<b.y||cy>b.y+b.h)return;
-  const x0=q.x0-2-b.x,y0=q.y0-2-b.y,x1=q.x1+2-b.x,y1=q.y1+2-b.y;x.fillStyle=x0-3>=0?px(x0-3,(y0+y1)/2):px(x1+3,(y0+y1)/2);x.fillRect(x0,y0,x1-x0,y1-y0)});
+  const x0=q.x0-3-b.x,y0=q.y0-3-b.y,x1=q.x1+3-b.x,y1=q.y1+3-b.y;x.fillStyle=x0-4>=0?px(x0-4,(y0+y1)/2):px(x1+4,(y0+y1)/2);x.fillRect(x0,y0,x1-x0,y1-y0)});
+ if(LN){LN.h.forEach(s=>{const y0=s.p-s.t/2-2-b.y,y1=s.p+s.t/2+2-b.y,x0=s.a-b.x,x1=s.b-b.x;if(y1<0||y0>b.h||x1<0||x0>b.w)return;x.fillStyle=px((Math.max(0,x0)+Math.min(b.w,x1))/2,y0-3);x.fillRect(x0,y0,x1-x0,y1-y0)});
+  LN.v.forEach(s=>{const x0=s.p-s.t/2-2-b.x,x1=s.p+s.t/2+2-b.x,y0=s.a-b.y,y1=s.b-b.y;if(x1<0||x0>b.w||y1<0||y0>b.h)return;x.fillStyle=px(x0-3,(Math.max(0,y0)+Math.min(b.h,y1))/2);x.fillRect(x0,y0,x1-x0,y1-y0)})}
  const small=b.w*b.h<40000;return{bytes:small?await pngBytes(o):new Uint8Array(await(await toB(o,'image/jpeg',.92)).arrayBuffer()),png:small}}
+/* ---- Rebuild v2 helpers ---- */
+const rbWords=d=>{let a=[];if(d.words&&d.words.length)a=d.words.map(w=>({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1,c:w.confidence}));
+ if(!a.length&&d.tsv)d.tsv.split('\n').forEach(l=>{const q=l.split('\t');if(q.length>=12&&q[0]=='5'&&q[11]&&q[11].trim()){const x=+q[6],y=+q[7];a.push({t:q[11].trim(),x0:x,y0:y,x1:x+ +q[8],y1:y+ +q[9],c:+q[10]})}});
+ if(!a.length&&d.blocks)d.blocks.forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(w=>a.push({t:w.text,x0:w.bbox.x0,y0:w.bbox.y0,x1:w.bbox.x1,y1:w.bbox.y1,c:w.confidence})))));
+ return a.filter(w=>w.t&&w.t.trim()&&w.x1>w.x0&&w.y1>w.y0)};
+/* same word found twice by OCR -> keep the surer one */
+function rbDedupe(ws){const s=ws.slice().sort((a,b)=>(b.c||0)-(a.c||0)),k=[];
+ s.forEach(q=>{const dup=k.some(o=>{const ix=Math.min(o.x1,q.x1)-Math.max(o.x0,q.x0),iy=Math.min(o.y1,q.y1)-Math.max(o.y0,q.y0);if(ix<=0||iy<=0)return false;return ix*iy>.5*Math.min((o.x1-o.x0)*(o.y1-o.y0),(q.x1-q.x0)*(q.y1-q.y0))});if(!dup)k.push(q)});return k}
+/* line grouping by vertical overlap with that line only (not one global height) */
+function rbLines2(ws){if(!ws.length)return[];const s=ws.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)),L=[];
+ s.forEach(q=>{const qh=q.y1-q.y0;let best=null,bs=.5;
+  for(let i=L.length-1;i>=Math.max(0,L.length-40);i--){const l=L[i],ov=Math.min(q.y1,l.y1)-Math.max(q.y0,l.y0);if(ov<=0)continue;const r=ov/Math.min(qh,l.y1-l.y0);
+   if(r>=bs&&l.w.every(o=>Math.min(o.x1,q.x1)-Math.max(o.x0,q.x0)<Math.min(o.x1-o.x0,qh*9,q.x1-q.x0)*.3)){bs=r;best=l}}
+  if(best){const n=best.w.length;best.y0=(best.y0*n+q.y0)/(n+1);best.y1=(best.y1*n+q.y1)/(n+1);best.w.push(q)}else L.push({y0:q.y0,y1:q.y1,w:[q]})});
+ L.forEach(l=>{l.w.sort((a,b)=>a.x0-b.x0);l.h=rbMed(l.w.map(w=>w.y1-w.y0));const nd=l.w.filter(w=>!/[gjpqyQ,;()\[\]{}|]/.test(w.t));l.base=nd.length?rbMed(nd.map(w=>w.y1)):rbMed(l.w.map(w=>w.y1))-l.h*.2});
+ L.sort((a,b)=>a.base-b.base);return L}
+/* stroke thickness / glyph height of a word: bold words have thicker strokes */
+function rbStroke(dk,w,h,q){const x0=Math.max(0,q.x0|0),x1=Math.min(w-1,q.x1|0),y0=Math.max(0,q.y0|0),y1=Math.min(h-1,q.y1|0),hh=Math.max(1,q.y1-q.y0),runs=[];
+ for(let y=y0;y<=y1;y++){let r=0;for(let x=x0;x<=x1+1;x++){if(x<=x1&&dk[y*w+x])r++;else{if(r>0&&r<=hh*.6)runs.push(r);r=0}}}
+ if(runs.length<4)return 0;runs.sort((a,b)=>a-b);return runs[runs.length>>1]/hh}
+const rbDist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+/* text colour + background colour of a word, sampled from the real pixels */
+function rbWordCol(d,w,h,q){const x0=Math.max(0,q.x0|0),x1=Math.min(w-1,q.x1|0),y0=Math.max(0,q.y0|0),y1=Math.min(h-1,q.y1|0),ring=[];
+ const pick=(x,y)=>{if(x<0||y<0||x>=w||y>=h)return;const i=(y*w+x)*4;ring.push([d[i],d[i+1],d[i+2]])};
+ for(let x=x0;x<=x1;x+=2){pick(x,y0-3);pick(x,y1+3)}for(let y=y0;y<=y1;y+=2){pick(x0-3,y);pick(x1+3,y)}
+ const med=k=>{const a=ring.map(p=>p[k]).sort((p,r)=>p-r);return a.length?a[a.length>>1]:255};
+ const bg=[med(0),med(1),med(2)],bl=bg[0]*.3+bg[1]*.59+bg[2]*.11;let mx=0;const df=[];
+ for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=(y*w+x)*4,v=Math.abs(d[i]*.3+d[i+1]*.59+d[i+2]*.11-bl);if(v>mx)mx=v;df.push(v)}
+ let n=0,r=0,g=0,b=0,k=0;
+ if(mx>=50){const th=mx*.75;for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++,k++){if(df[k]>=th){const i=(y*w+x)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++}}}
+ let fg=n?[r/n,g/n,b/n]:[0,0,0];const fl=fg[0]*.3+fg[1]*.59+fg[2]*.11,sat=Math.max(...fg)-Math.min(...fg),inv=fl>bl;
+ if(sat<45)fg=inv?[255,255,255]:(fl<150?[0,0,0]:[70,70,70]);
+ return{fg,bg,inv}}
+function rbLineCol(ink,s,hor){const{d,w,h}=ink,pts=[];
+ for(let t=.1;t<=.91;t+=.133){const u=Math.round(s.a+(s.b-s.a)*t);let bp=null,bl=999;for(let o=-1;o<=1;o++){const p=Math.round(s.p)+o,x=hor?u:p,y=hor?p:u;if(x<0||y<0||x>=w||y>=h)continue;const i=(y*w+x)*4,l=d[i]*.3+d[i+1]*.59+d[i+2]*.11;if(l<bl){bl=l;bp=[d[i],d[i+1],d[i+2]]}}if(bp)pts.push([bl,bp])}
+ if(!pts.length)return[0,0,0];pts.sort((a,b)=>a[0]-b[0]);const u=pts.slice(0,Math.max(1,Math.ceil(pts.length/2))).map(p=>p[1]),c=[0,1,2].map(k=>u.reduce((t,p)=>t+p[k],0)/u.length);
+ const sat=Math.max(...c)-Math.min(...c),l=c[0]*.3+c[1]*.59+c[2]*.11;if(sat<45)return l<140?[20,20,20]:[90,90,90];return c}
+async function rbWordImg(c,q){const pad=2,x0=Math.max(0,Math.floor(q.x0)-pad),y0=Math.max(0,Math.floor(q.y0)-pad),w=Math.min(c.width,Math.ceil(q.x1)+pad)-x0,h=Math.min(c.height,Math.ceil(q.y1)+pad)-y0;if(w<2||h<2)return null;const o=cv(w,h);o.getContext('2d').drawImage(c,x0,y0,w,h,0,0,w,h);const bytes=await pngBytes(o);o.width=o.height=0;return{bytes,x:x0,y:y0,w,h}}
+const RBASC=/[A-Z0-9bdfhkl]/;
 window.rbRun=()=>run(async()=>{const fs=[...$('#f').files];if(!fs.length)throw new Error('Pehle photo ya PDF chuno');
  const isP=f=>/\.pdf$/i.test(f.name)||f.type=='application/pdf';if(fs.length>1&&fs.some(isP))throw new Error('PDF ek baar me ek hi. Photos kai ek saath chal sakti hain.');
- const lang=$('#rb_l').value,dpi=+$('#rb_q').value,jobs=await p8Jobs(fs,$('#rb_r').value.trim(),20),str=$('#rb_s').checked,cln=$('#rb_c').checked,wL=$('#rb_t').checked,wI=$('#rb_i').checked,wB=$('#rb_b').checked,hin=/hin/.test(lang);
- await PL();const F=PDFLib,out=await F.PDFDocument.create(),hv=await out.embedFont(F.StandardFonts.Helvetica),hb=await out.embedFont(F.StandardFonts.HelveticaBold);let hf=null,hnote='';
- if(hin){try{await RBFK();out.registerFontkit(fontkit);const r=await fetch(RBHI);if(!r.ok)throw 0;hf=await out.embedFont(await r.arrayBuffer(),{subset:true})}catch(z){hf=null;hnote=' · Hindi font load nahi hua, Hindi words chhoot gaye (internet chahiye)'}}
- const can=t=>/^[\x20-\x7E\xA0-\xFF]*$/.test(t);let w=null,nw=0,nl=0,ni=0,skipped=0,rot=[],thumb=null;
- try{w=await p8W(lang,0);for(let k=0;k<jobs.length;k++){const j=jobs[k];p8Cur=(k+1)+'/'+jobs.length+' · '+j.label;
+ const lang=$('#rb_l').value,dpi=+$('#rb_q').value,psm=+$('#rb_m').value||0,jobs=await p8Jobs(fs,$('#rb_r').value.trim(),20),str=$('#rb_s').checked,cln=$('#rb_c').checked,wL=$('#rb_t').checked,wI=$('#rb_i').checked,wB=$('#rb_b').checked,wO=$('#rb_o').checked,wK=$('#rb_k').checked,hin=/hin/.test(lang);
+ await PL();const F=PDFLib,out=await F.PDFDocument.create(),hv=await out.embedFont(F.StandardFonts.Helvetica),hb=await out.embedFont(F.StandardFonts.HelveticaBold);let hf=null,hnote='',hfT=false;
+ const loadHf=async()=>{if(hf||hfT)return;hfT=true;try{await RBFK();out.registerFontkit(fontkit);const r=await fetch(RBHI);if(!r.ok)throw 0;hf=await out.embedFont(await r.arrayBuffer(),{subset:true})}catch(z){hf=null;hnote=' · Hindi/₹ font load nahi hua, un words ke symbols chhoot gaye (internet chahiye)'}};
+ if(hin)await loadHf();
+ const can=t=>/^[\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]*$/.test(t);let w=null,nw=0,nl=0,ni=0,nk=0,fb=0,skipped=0,rot=[],thumb=null;
+ const cap=F.LineCapStyle?{lineCap:F.LineCapStyle.Projecting}:{};
+ try{w=await p8W(lang,psm);for(let k=0;k<jobs.length;k++){const j=jobs[k];p8Cur=(k+1)+'/'+jobs.length+' · '+j.label;
   let c=await p8Cv(j,dpi/72),pw;if(j.pdf){const vp=(await j.pdf.getPage(j.pg)).getViewport({scale:1});pw=vp.width}else pw=595.28;
   let ang=0;if(str){ang=rbSkew(c);if(Math.abs(ang)>=.5){const c2=rbRot(c,ang);c.width=c.height=0;c=c2}else ang=0}rot.push(ang);
   const oc=cln?rbClean(c):c,r=await w.recognize(oc,{},{text:true,tsv:true,blocks:true});if(oc!==c)oc.width=oc.height=0;
-  const WD=oxWords(r.data),L=rbLines(WD),K=pw/c.width,H=c.height*K,page=out.addPage([c.width*K,H]);
-  const ink=(wL||wI||wB)?rbInk(c):null;
-  let lines={h:[],v:[]};if(wL)lines=rbFindLines(ink.dark,c.width,c.height);
+  const WD=rbDedupe(rbWords(r.data).filter(q=>!/^[|¦]+$/.test(q.t.trim()))),L=rbLines2(WD),K=pw/c.width,H=c.height*K,page=out.addPage([c.width*K,H]);
+  if(!hf&&!hfT&&WD.some(q=>!can(q.t.trim())))await loadHf();
+  const ink=rbInk(c),CW=c.width,CH=c.height;
+  let lines={h:[],v:[]};if(wL){lines=rbFindLines(ink.lin,CW,CH);rbCleanLines(lines,WD)}
+  WD.forEach(q=>{q.t=q.t.trim();q.dash=/^[-_=~\u2014\u2013]{4,}$/.test(q.t);q.lo=wK&&!q.dash&&q.c<45;q.col=(wO||wB)?rbWordCol(ink.d,CW,CH,q):null;q.st=wB?rbStroke(ink.dark,CW,CH,q):0});
+  const bgs=WD.filter(q=>q.col).map(q=>q.col.bg),paper=bgs.length?[0,1,2].map(i=>rbMed(bgs.map(b=>b[i]))):[255,255,255];
   /* 1. images (bottom layer) */
-  if(wI){const bl=rbBlobs(ink.any,c.width,c.height,WD,lines);
-   for(const b of bl){try{const cr=await rbCrop(c,b,WD),im=cr.png?await out.embedPng(cr.bytes):await out.embedJpg(cr.bytes);page.drawImage(im,{x:b.x*K,y:H-(b.y+b.h)*K,width:b.w*K,height:b.h*K});ni++}catch(z){}}}
-  /* 2. table lines, vector */
-  const blk=F.rgb(.05,.05,.05),lw=t=>Math.max(.4,t*K);
-  lines.h.forEach(s=>{page.drawLine({start:{x:s.a*K,y:H-s.p*K},end:{x:s.b*K,y:H-s.p*K},thickness:lw(s.t),color:blk});nl++});
-  lines.v.forEach(s=>{page.drawLine({start:{x:s.p*K,y:H-s.a*K},end:{x:s.p*K,y:H-s.b*K},thickness:lw(s.t),color:blk});nl++});
-  /* 3. text */
-  for(const l of L){const ls=l.h*K;let bold=new Set();
-   if(wB&&ink){const dn=l.w.map(q=>{let t=0,x0=Math.max(0,q.x0|0),x1=Math.min(c.width-1,q.x1|0),y0=Math.max(0,q.y0|0),y1=Math.min(c.height-1,q.y1|0);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)t+=ink.dark[y*c.width+x];return t/Math.max(1,(x1-x0+1)*(y1-y0+1))}),md=rbMed(dn);
-    l.w.forEach((q,i)=>{if(l.w.length>=3&&dn[i]>md*1.35&&dn[i]>.28)bold.add(q)});if(l.w.length<3&&dn.length&&dn.every(v=>v>.38))l.w.forEach(q=>bold.add(q))}
-   for(const wd of l.w){const t=wd.t.trim(),bw=(wd.x1-wd.x0)*K;let f=null,tx=t;
-    if(can(t))f=bold.has(wd)?hb:hv;else if(hf){f=hf;tx=t.replace(/[\u200B-\u200F]/g,'')}else{tx=t.replace(/[^\x20-\x7E\xA0-\xFF]/g,'');f=hv;if(!tx){skipped++;continue}}
-    let w1;try{w1=f.widthOfTextAtSize(tx,1)}catch(z){skipped++;continue}if(!w1)continue;
-    let sz=bw/w1;sz=Math.max(ls*.7,Math.min(ls*1.25,sz));sz=Math.max(3,Math.min(sz,200));
-    try{page.drawText(tx,{x:wd.x0*K,y:H-l.base*K,size:sz,font:f,color:F.rgb(0,0,0)});nw++}catch(z){skipped++}}}
+  if(wI){const bl=rbBlobs(ink.any,CW,CH,WD,lines);
+   for(const b of bl){try{const cr=await rbCrop(c,b,WD,lines),im=cr.png?await out.embedPng(cr.bytes):await out.embedJpg(cr.bytes);page.drawImage(im,{x:b.x*K,y:H-(b.y+b.h)*K,width:b.w*K,height:b.h*K});ni++}catch(z){}}}
+  /* 2. coloured bars behind text (header bands) */
+  if(wO)for(const l of L){let run=null;const flush=()=>{if(run){page.drawRectangle({x:run.x0*K,y:H-run.y1*K,width:(run.x1-run.x0)*K,height:(run.y1-run.y0)*K,color:F.rgb(run.r/255,run.g/255,run.b/255),borderWidth:0});run=null}};
+   for(const q of l.w){const bg=q.col&&q.col.bg;if(!bg||rbDist(bg,paper)<75){flush();continue}
+    if(run&&rbDist([run.r,run.g,run.b],bg)<35){run.x1=q.x1+2;run.y0=Math.min(run.y0,q.y0-2);run.y1=Math.max(run.y1,q.y1+2)}else{flush();run={x0:q.x0-2,x1:q.x1+2,y0:q.y0-2,y1:q.y1+2,r:bg[0],g:bg[1],b:bg[2]}}}flush()}
+  /* 3. unsure words stay as a picture of the original */
+  if(wK){let cnt=0;for(const q of WD){if(!q.lo||cnt>=120)continue;try{const m=await rbWordImg(c,q);if(!m)continue;const im=await out.embedPng(m.bytes);page.drawImage(im,{x:m.x*K,y:H-(m.y+m.h)*K,width:m.w*K,height:m.h*K});cnt++;nk++}catch(z){}}}
+  /* 4. table lines, vector, real colour */
+  const lw=t=>Math.max(.4,Math.min(t,6)*K),rgbOf=a=>F.rgb(a[0]/255,a[1]/255,a[2]/255);
+  lines.h.forEach(s=>{page.drawLine({start:{x:s.a*K,y:H-s.p*K},end:{x:s.b*K,y:H-s.p*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,true)),...cap});nl++});
+  lines.v.forEach(s=>{page.drawLine({start:{x:s.p*K,y:H-s.a*K},end:{x:s.p*K,y:H-s.b*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,false)),...cap});nl++});
+  /* 5. text: size from the line, width stretched to the exact box, own colour and weight */
+  for(const l of L){
+   const asc=l.w.filter(q=>RBASC.test(q.t)&&!q.lo),use=(asc.length?asc:l.w).map(q=>l.base-q.y0).sort((a,b)=>a-b),capH=use[Math.min(use.length-1,Math.floor(use.length*.75))],lsz=Math.max(3,capH*K/.74);
+   const sts=l.w.filter(q=>q.st>0);let lineBold=false;
+   if(wB&&sts.length>=3){const g=ink._gm||(ink._gm=rbMed(WD.filter(q=>q.st>0).map(q=>q.st)));lineBold=sts.filter(q=>q.st>g*1.3).length>=sts.length*.6}
+   const gmed=wB?(ink._gm||(ink._gm=rbMed(WD.filter(q=>q.st>0).map(q=>q.st))||0)):0;
+   for(const wd of l.w){const t=wd.t,bw=(wd.x1-wd.x0)*K,col=wd.col?wd.col.fg:[0,0,0],clr=rgbOf(col);
+    if(wd.lo)continue;
+    if(wd.dash){const yy=(wd.y0+wd.y1)/2,th=Math.max(.4,Math.min(2.5,(wd.y1-wd.y0)*K));page.drawLine({start:{x:wd.x0*K,y:H-yy*K},end:{x:wd.x1*K,y:H-yy*K},thickness:th,color:clr});nl++;continue}
+    const bold=wB&&(lineBold||(gmed&&wd.st>gmed*1.3&&wd.st-gmed>.025&&t.length>=2));let f=null,tx=t,isH=false;
+    if(can(t))f=bold?hb:hv;else if(hf){f=hf;isH=true;tx=t.replace(/[\u200B-\u200F]/g,'')}else{tx=t.replace(/[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]/g,'');f=hv;if(!tx){skipped++;continue}}
+    const wb=(Math.abs(wd.y1-l.base)<l.h*.3&&!/[gjpqyQ,;()\[\]{}|]/.test(t))?wd.y1:l.base;
+    let sz=lsz;if(isH)sz=Math.max(3,(wd.y1-wd.y0)*K/1.05);else if(RBASC.test(t)){const own=(wb-wd.y0)*K/.74;if(own>0&&Math.abs(own/lsz-1)>.22)sz=own}
+    sz=Math.max(3,Math.min(sz,200));
+    let w1;try{w1=f.widthOfTextAtSize(tx,sz)}catch(z){skipped++;continue}if(!w1)continue;
+    let sx=bw/w1;sx=Math.max(.4,Math.min(2.5,sx));if(Math.abs(sx-1)<.03)sx=1;
+    const px=wd.x0*K,py=H-wb*K;
+    try{page.setFont(f);const fk=page.getFont()[1];page.pushOperators(F.pushGraphicsState(),F.beginText(),F.setFillingColor(clr),F.setFontAndSize(fk,sz),F.setTextMatrix(sx,0,0,1,px,py),F.showText(f.encodeText(tx)),F.endText(),F.popGraphicsState());nw++}
+    catch(z){try{page.drawText(tx,{x:px,y:py,size:Math.max(3,Math.min(sz,sz*sx)),font:f,color:clr});nw++;fb++}catch(z2){skipped++}}}}
   if(k==0){const s=Math.min(1,700/c.width),t=drw(c,Math.round(c.width*s),Math.round(c.height*s),'image/jpeg');thumb=t.toDataURL('image/jpeg',.75);t.width=t.height=0}
   c.width=c.height=0}}finally{await p8End(w)}
- if(!nw&&!nl&&!ni)throw new Error('Kuch nahi mila. Scan saaf, seedha aur bhasha sahi chuni ho, phir try karo.');
+ if(!nw&&!nl&&!ni&&!nk)throw new Error('Kuch nahi mila. Scan saaf, seedha aur bhasha sahi chuni ho, phir try karo.');
  const blob=await sv(out),tot=fs.reduce((s,f)=>s+f.size,0),sk=rot.filter(a=>a).length;
- showOut([{name:bn(fs[0].name)+'_rebuilt.pdf',blob,o:tot,note:jobs.length+' page · '+nw+' words · '+nl+' lines · '+ni+' images'+(sk?' · '+sk+' page seedha kiya':'')+(skipped?' · '+skipped+' words chhoot gaye':'')+hnote}]);
+ showOut([{name:bn(fs[0].name)+'_rebuilt.pdf',blob,o:tot,note:jobs.length+' page · '+nw+' words · '+nl+' lines · '+ni+' images'+(nk?' · '+nk+' shak wale words image rakhe':'')+(sk?' · '+sk+' page seedha kiya':'')+(skipped?' · '+skipped+' words chhoot gaye':'')+(fb?' · '+fb+' words simple mode me':'')+hnote}]);
  try{const pdf=await pOpen(new Uint8Array(await blob.arrayBuffer())),pc=await pRender(await pdf.getPage(1),1.4),u=pc.toDataURL('image/png');pc.width=pc.height=0;
   const el=document.querySelector('#tr');if(el)el.insertAdjacentHTML('beforeend',`<section class="card"><h3>Pehle aur baad (page 1)</h3><p class="mu">Left: asli. Right: naya rebuilt PDF. Zoom karke dekho, text aur lines clear rehti hain.</p><div style="display:flex;gap:8px"><img src="${thumb}" style="width:50%;min-width:0;border-radius:8px;border:1px solid #8884"><img src="${u}" style="width:50%;min-width:0;border-radius:8px;border:1px solid #8884;background:#fff"></div></section>`)}catch(z){}});
-V.rb=['Rebuild PDF',()=>`${fin('image/*,application/pdf,.pdf',1)}<div class="grid"><label>Bhasha<select id="rb_l">${P8L}</select></label><label>OCR quality<select id="rb_q"><option value="200">Achhi (200 dpi)</option><option value="150">Normal (150 dpi)</option><option value="300">Bahut achhi, dheere (300 dpi)</option></select></label><label>PDF pages (khali = sab)<input id="rb_r" placeholder="all"></label></div>${[['s','Tedhi photo ya scan khud seedha karo'],['c','Padhne se pehle image saaf karo (contrast)'],['t','Table ke box aur lines vector me banao'],['i','Logo, stamp, photo, signature original se crop karke lagao'],['b','Bold text pehchano']].map(a=>`<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="rb_${a[0]}" checked style="width:auto;margin:0"> ${a[1]}</label>`).join('')}<div class="row"><button onclick="rbRun()">Rebuild PDF banao</button></div><p class="mu">OCR se har word uski jagah par asli text ban jata hai (zoom me nahi phatta, select/copy hota hai). Table ki seedhi lines pakad kar vector box ban jate hain aur columns saaf aligned rehte hain. Logo, stamp, photo aur signature original image se crop hokar wahin lagte hain, to wo asli jaise dikhte hain par zoom me utne hi sharp jitni scan thi. Font nearest standard font hoga, exact nahi. Bina lines wali table me sirf text aligned rehta hai, box nahi banta. Rang wale cell fill abhi nahi aate. Ek baar me 20 pages tak. OCR engine pehli baar download hota hai.</p>`];
+
+V.rb=['Rebuild PDF',()=>`${fin('image/*,application/pdf,.pdf',1)}<div class="grid"><label>Bhasha<select id="rb_l">${P8L}</select></label><label>OCR quality<select id="rb_q"><option value="200">Achhi (200 dpi)</option><option value="150">Normal (150 dpi)</option><option value="300">Bahut achhi, dheere (300 dpi)</option></select></label><label>Layout<select id="rb_m"><option value="0">Auto</option><option value="6">Bill / ek block</option><option value="4">Ek column</option><option value="11">Bikhra text</option></select></label><label>PDF pages (khali = sab)<input id="rb_r" placeholder="all"></label></div>${[['s','Tedhi photo ya scan khud seedha karo'],['c','Padhne se pehle image saaf karo (contrast)'],['t','Table ke box aur lines vector me banao'],['i','Logo, stamp, photo, signature original se crop karke lagao'],['b','Bold text pehchano'],['o','Text ka rang aur rang wali patti (header bar) pehchano'],['k','Jin words par OCR ko bharosa nahi, unhe image rakho (galat text na bane)']].map(a=>`<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="rb_${a[0]}" checked style="width:auto;margin:0"> ${a[1]}</label>`).join('')}<div class="row"><button onclick="rbRun()">Rebuild PDF banao</button></div><p class="mu">OCR se har word uski jagah par asli text ban jata hai (zoom me nahi phatta, select/copy hota hai). Table ki seedhi lines pakad kar vector box ban jate hain aur columns saaf aligned rehte hain. Logo, stamp, photo aur signature original image se crop hokar wahin lagte hain, to wo asli jaise dikhte hain par zoom me utne hi sharp jitni scan thi. Font nearest standard font hoga, exact nahi. Bina lines wali table me sirf text aligned rehta hai, box nahi banta. Rang wali patti tabhi aati hai jab wo kagaz ke rang se kaafi alag ho. Ek baar me 20 pages tak. OCR engine pehli baar download hota hai.</p>`];
 
 lgApply();
 
