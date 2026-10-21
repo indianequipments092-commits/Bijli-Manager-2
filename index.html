@@ -1983,7 +1983,7 @@ function rbSegs(dk,w,h,hor,minLen,maxT){const A=hor?w:h,B=hor?h:w,res=[];let pre
 function rbCluster(a,tol){const s=a.slice().sort((x,y)=>x.p-y.p);let g=[];const flush=()=>{if(g.length){const m=g.reduce((t,q)=>t+q.p,0)/g.length;g.forEach(q=>q.p=m)}g=[]};
  s.forEach(q=>{if(g.length&&q.p-g[g.length-1].p>tol)flush();g.push(q)});flush()}
 function rbMerge(arr,gap){const s=arr.slice().sort((x,y)=>x.p-y.p||x.a-y.a),o=[];s.forEach(q=>{const l=o[o.length-1];if(l&&Math.abs(l.p-q.p)<=1.6&&q.a-l.b<=gap){l.b=Math.max(l.b,q.b);l.t=Math.max(l.t,q.t)}else o.push({a:q.a,b:q.b,p:q.p,t:q.t})});return o}
-function rbCleanLines(L,WD){const keep=(s,hor)=>{let cov=0;WD.forEach(q=>{const qa=hor?q.x0:q.y0,qb=hor?q.x1:q.y1,pa=hor?q.y0:q.x0,pb=hor?q.y1:q.x1,m=(pb-pa)*.2;if(s.p>pa+m&&s.p<pb-m){const o=Math.min(qb,s.b)-Math.max(qa,s.a);if(o>0)cov+=o}});return cov<.35*(s.b-s.a)};L.h=L.h.filter(s=>keep(s,true));L.v=L.v.filter(s=>keep(s,false))}
+function rbCleanLines(L,WD){const keep=(s,hor)=>{let cov=0;WD.forEach(q=>{const qa=hor?q.x0:q.y0,qb=hor?q.x1:q.y1,pa=hor?q.y0:q.x0,pb=hor?q.y1:q.x1,m=(pb-pa)*.2;if(s.p>pa+m&&s.p<pb-m){const o=Math.min(qb,s.b)-Math.max(qa,s.a);if(o>0)cov+=o}});return cov<.15*(s.b-s.a)};L.h=L.h.filter(s=>keep(s,true));L.v=L.v.filter(s=>keep(s,false))}
 function rbFindLines(dk,w,h){const minH=Math.max(30,Math.round(w*.04)),minV=Math.max(30,Math.round(h*.03)),maxT=7;
  let H=rbSegs(dk,w,h,true,minH,maxT),V=rbSegs(dk,w,h,false,minV,maxT);
  rbCluster(H,4);rbCluster(V,4);H=rbMerge(H,14);V=rbMerge(V,14);
@@ -2087,65 +2087,159 @@ function rbLineCol(ink,s,hor){const{d,w,h}=ink,pts=[];
  const sat=Math.max(...c)-Math.min(...c),l=c[0]*.3+c[1]*.59+c[2]*.11;if(sat<45)return l<140?[20,20,20]:[90,90,90];return c}
 async function rbWordImg(c,q){const pad=2,x0=Math.max(0,Math.floor(q.x0)-pad),y0=Math.max(0,Math.floor(q.y0)-pad),w=Math.min(c.width,Math.ceil(q.x1)+pad)-x0,h=Math.min(c.height,Math.ceil(q.y1)+pad)-y0;if(w<2||h<2)return null;const o=cv(w,h);o.getContext('2d').drawImage(c,x0,y0,w,h,0,0,w,h);const bytes=await pngBytes(o);o.width=o.height=0;return{bytes,x:x0,y:y0,w,h}}
 const RBASC=/[A-Z0-9bdfhkl]/;
+/* ---- Rebuild: data safety (position-aware fixes for PAN / GSTIN / IFSC / phone / money) ---- */
+const RBD={O:'0',o:'0',Q:'0',D:'0',I:'1',l:'1','|':'1',i:'1',Z:'2',z:'2',S:'5',s:'5',B:'8',b:'6',G:'6',T:'7'},RBL={'0':'O','1':'I','5':'S','8':'B','2':'Z','6':'G'};
+const RBLEX=['Invoice','Dated','Buyer','Order','Dispatch','Delivery','Note','Consignee','Description','Goods','Quantity','Rate','Amount','Total','Taxable','Value','Central','Integrated','Chargeable','Declaration','Authorised','Signatory','Terms','Payment','Reference','References','Details','Branch','Contact','Credit','Company','Mode','Remarks'];
+function rbPos(t,pat){if(t.length!==pat.length)return null;let o='';
+ for(let i=0;i<t.length;i++){const ch=t[i],p=pat[i];
+  if(p==='D'){if(/\d/.test(ch))o+=ch;else if(RBD[ch])o+=RBD[ch];else return null}
+  else if(p==='L'){if(/[A-Z]/.test(ch))o+=ch;else if(RBL[ch])o+=RBL[ch];else return null}
+  else if(p==='A'){if(/[A-Z0-9]/.test(ch))o+=ch;else return null}
+  else if(p==='Z'){if(ch==='Z'||ch==='2'||ch==='z')o+='Z';else return null}
+  else if(p==='0'){if(ch==='0'||ch==='O'||ch==='o')o+='0';else return null}}
+ return o}
+function rbLev(a,b){const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++){d[i]=[i];for(let j=1;j<=n;j++)d[i][j]=i?0:j}
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+function rbFix(WD,L,pg,FX,CK){
+ const isLex=x=>RBLEX.some(y=>y.toLowerCase()===x.toLowerCase());
+ for(const l of L){
+  const txt=l.w.map(q=>q.t).join(' '),ctx=l.w.filter(q=>isLex(q.t.replace(/[^A-Za-z]/g,''))).length,
+   hasPAN=/\bPAN\b/i.test(txt),hasGST=/GSTIN|GST|UIN/i.test(txt),hasIFS=/IFS/i.test(txt),hasPh=/contact|mob|phone|tel\b|ph\b/i.test(txt),hasAc=/a\/c|account|a\.c/i.test(txt),
+   amtLine=l.w.some(q=>/^\d[\d,]*\.\d{2}$/.test(q.t));
+  for(const q of l.w.slice()){
+   const t=q.t.replace(/^[:;,]+|[:;,]+$/g,'');let nt=null,why='',m;
+   if(hasPAN&&t.length===10){const r=rbPos(t,'LLLLLDDDDL');if(r){if(r!==t){nt=r;why='PAN'}else q.ver=true}}
+   else if(t.length===15&&(hasGST||/^\d{2}[A-Z]/.test(t))){const r=rbPos(t,'DDLLLLLDDDDLAZA');if(r){if(r!==t&&hasGST){nt=r;why='GSTIN'}else if(r===t)q.ver=true}}
+   else if(hasIFS&&t.length===11){const r=rbPos(t,'LLLL0AAAAAA');if(r){if(r!==t){nt=r;why='IFS code'}else q.ver=true}}
+   else if(hasPh&&/^[6-9]\d{9}$/.test(t))q.ver=true;
+   else if(hasPh&&t.length===11&&(m=t.match(/^[|Il1!]([6-9]\d{9})$/))){nt=m[1];why='Contact (extra digit hata diya)'}
+   else if(hasAc&&/^[0-9OoIlSB]{9,18}$/.test(t)&&(t.match(/\d/g)||[]).length>=t.length*.7&&/[OoIlSB]/.test(t)){nt=t.replace(/[OoIlSB]/g,c=>RBD[c]);why='A/c no.'}
+   else if((m=t.match(/^[%¥&?Z]\s?(\d[\d,]*\.\d{2})$/))){nt='₹'+m[1];why='₹ symbol'}
+   else if((m=t.match(/^(\d[\d,]*\.\d{2})[)|\]]+$/))){nt=m[1];why='amount ke baad extra nishan'}
+   else if(amtLine&&(m=t.match(/^(\d{3,})[)|\]]$/))){const d=m[1],g=d.slice(0,-2)+'.'+d.slice(-2);CK.push({p:pg,a:q.t,b:g,w:'amount (decimal andaaza)'});q.t=g;q.chk=true}
+   else if(ctx>=2&&/^[A-Za-z]{4,}$/.test(t)&&!isLex(t)&&q.c<80){const x=RBLEX.find(y=>Math.abs(y.length-t.length)<=1&&rbLev(y.toLowerCase(),t.toLowerCase())===1);if(x){nt=t[0]===t[0].toUpperCase()?x:x[0].toLowerCase()+x.slice(1);why='label'}}
+   if(nt!==null&&nt!==q.t){FX.push({p:pg,a:q.t,b:nt,w:why});q.t=nt;q.ver=true;if(/^(PAN|GSTIN|IFS code|Contact|A\/c)/.test(why))q.c=Math.max(q.c||0,90)}
+   if(q.t.length>1&&q.t[0]==='₹'){const n=q.t.length,wd=(q.x1-q.x0)/n,sy={...q,t:'₹',x1:q.x0+wd};const ix=l.w.indexOf(q);q.x0=q.x0+wd;q.t=q.t.slice(1);l.w.splice(ix,0,sy);WD.push(sy)}}}}
+/* ---- Rebuild Phase 2: header re-read, italic, cell reading order, hybrid, editable data check ---- */
+const RBOV=window.RBOV=window.RBOV||{};
+function rbOv(WD,pg){WD.forEach(q=>{const v=RBOV[pg+'|'+q.t];if(v!=null&&v!==q.t){q.t=v;q.ver=true;q.lo=false;q.c=100}})}
+/* italic: shear the ink back; if vertical stems line up much better at 10-20 degrees it is italic */
+function rbItal(dk,w,h,q){const x0=Math.max(0,q.x0|0),x1=Math.min(w-1,q.x1|0),y0=Math.max(0,q.y0|0),y1=Math.min(h-1,q.y1|0),hh=y1-y0+1,ww=x1-x0+1;if(hh<10||ww<10)return 0;
+ const off=Math.ceil(.4*hh)+2,pj=new Float64Array(ww+2*off+2);let best=0,bs=0,base=0;
+ for(let s=0;s<=.361;s+=.06){pj.fill(0);for(let y=y0;y<=y1;y++){const sh=Math.round(s*(y-(y0+y1)/2))+off;for(let x=x0;x<=x1;x++)if(dk[y*w+x])pj[x-x0+sh]++}
+  let v=0;for(let i=0;i<pj.length;i++)v+=pj[i]*pj[i];if(s===0)base=v;if(v>best){best=v;bs=s}}
+ return base>0&&bs>=.17&&best/base>1.06?1:0}
+/* reading order: words are grouped per table cell (cells top->bottom, left->right), lines built inside each cell */
+function rbCells(WD,ln){const m=new Map();
+ WD.forEach(q=>{const cx=(q.x0+q.x1)/2,cy=(q.y0+q.y1)/2;let t=-1,l=-1;
+  ln.h.forEach(s=>{if(cx>=s.a-6&&cx<=s.b+6&&s.p<cy-1&&s.p>t)t=s.p});
+  ln.v.forEach(s=>{if(cy>=s.a-6&&cy<=s.b+6&&s.p<cx-1&&s.p>l)l=s.p});
+  const k=Math.round(t)+'|'+Math.round(l);let g=m.get(k);if(!g){g={t,l,w:[]};m.set(k,g)}g.w.push(q)});
+ const o=[];[...m.values()].sort((a,b)=>a.t-b.t||a.l-b.l).forEach(g=>rbLines2(g.w).forEach(l=>o.push(l)));return o}
+/* header pass: oversized / unsure words are cut out alone, lines erased, (dark bar inverted), enlarged and read again */
+async function rbRe(w,c,ink,lines,WD,psm){
+ const mh=rbMed(WD.map(q=>q.y1-q.y0))||20;
+ const bad=WD.filter(q=>(q.y1-q.y0)>mh*1.7||(q.c<50&&q.t.replace(/\W/g,'').length<=4));
+ if(!bad.length)return 0;
+ let R=bad.map(q=>({x0:q.x0-6,y0:q.y0-4,x1:q.x1+6,y1:q.y1+4})),ch=true;
+ while(ch){ch=false;for(let i=0;i<R.length&&!ch;i++)for(let j=i+1;j<R.length;j++){const a=R[i],b=R[j];if(Math.min(a.x1,b.x1)>Math.max(a.x0,b.x0)&&Math.min(a.y1,b.y1)>Math.max(a.y0,b.y0)){R[i]={x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)};R.splice(j,1);ch=true;break}}}
+ R=R.slice(0,25);let n=0;
+ await w.setParameters({tessedit_pageseg_mode:'6'});
+ try{for(const g of R){
+  const x0=Math.max(0,Math.floor(g.x0)),y0=Math.max(0,Math.floor(g.y0)),x1=Math.min(c.width,Math.ceil(g.x1)),y1=Math.min(c.height,Math.ceil(g.y1)),bw=x1-x0,bh=y1-y0;if(bw<6||bh<6)continue;
+  const col=rbWordCol(ink.d,ink.w,ink.h,{x0,y0,x1,y1}),f=Math.max(1,Math.min(3,44/mh)),pad=12,o=cv(Math.round(bw*f)+pad*2,Math.round(bh*f)+pad*2),ox=o.getContext('2d'),bgc=`rgb(${col.bg.join(',')})`;
+  ox.fillStyle=bgc;ox.fillRect(0,0,o.width,o.height);ox.drawImage(c,x0,y0,bw,bh,pad,pad,bw*f,bh*f);ox.fillStyle=bgc;
+  lines.h.forEach(s=>{if(s.p>y0-3&&s.p<y1+3&&s.b>x0&&s.a<x1){const a=Math.max(s.a,x0);ox.fillRect(pad+(a-1-x0)*f,pad+(s.p-s.t/2-2-y0)*f,(Math.min(s.b,x1)-a+2)*f,(s.t+4)*f)}});
+  lines.v.forEach(s=>{if(s.p>x0-3&&s.p<x1+3&&s.b>y0&&s.a<y1){const a=Math.max(s.a,y0);ox.fillRect(pad+(s.p-s.t/2-2-x0)*f,pad+(a-1-y0)*f,(s.t+4)*f,(Math.min(s.b,y1)-a+2)*f)}});
+  if(col.inv){const im=ox.getImageData(0,0,o.width,o.height),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ox.putImageData(im,0,0)}
+  const r=await w.recognize(o,{},{text:true,tsv:true,blocks:true});o.width=o.height=0;
+  const nw=rbWords(r.data).filter(q=>!/^[|¦]+$/.test(q.t.trim())).map(q=>({...q,x0:x0+(q.x0-pad)/f,x1:x0+(q.x1-pad)/f,y0:y0+(q.y0-pad)/f,y1:y0+(q.y1-pad)/f}));
+  if(!nw.length)continue;
+  const old=WD.filter(q=>{const cx=(q.x0+q.x1)/2,cy=(q.y0+q.y1)/2;return cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1});
+  const avg=a=>a.length?a.reduce((t,q)=>t+(q.c||0),0)/a.length:0,big=old.some(q=>q.y1-q.y0>mh*1.7),sane=nw.every(q=>q.y1-q.y0<=mh*1.6);
+  if(sane&&(big||avg(nw)>=avg(old)-8)){old.forEach(q=>{const i=WD.indexOf(q);if(i>=0)WD.splice(i,1)});nw.forEach(q=>WD.push(q));n++}}}
+ finally{try{await w.setParameters({tessedit_pageseg_mode:String(psm||3)})}catch(z){}}
+ return n}
+function rbReport(FX,CK){const el=document.querySelector('#tr');if(!el||(!FX.length&&!CK.length))return;
+ const row=x=>{const k=x.p+'|'+x.b;return`<div class="li" style="cursor:default;display:block"><div class="mu">P${x.p} · ${e(x.w)}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span>${e(x.a)} →</span><input data-rbk="${e(k)}" value="${e(RBOV[k]!=null?RBOV[k]:x.b)}" style="flex:1;min-width:120px;font-weight:700"></div></div>`};
+ el.insertAdjacentHTML('beforeend',`<section class="card"><h3>Data check</h3>${FX.length?`<p class="mu">Auto-sudhaare (format dekh kar). Galat lage to yahin badlo:</p>${FX.map(row).join('')}`:''}${CK.length?`<p class="mu" style="margin-top:10px">Ye ek baar asli se milao, galat ho to yahin sahi likho:</p>${CK.map(row).join('')}`:''}<div class="row"><button onclick="rbApply()">Sudhaar lagake PDF dobara banao</button></div><p class="mu">Dobara banane me OCR phir nahi chalta, to jaldi hota hai.</p></section>`)}
+window.rbApply=()=>{document.querySelectorAll('[data-rbk]').forEach(i=>{const k=i.getAttribute('data-rbk'),b=k.slice(k.indexOf('|')+1);if(i.value!==b)RBOV[k]=i.value;else delete RBOV[k]});rbRun()};
+
 window.rbRun=()=>run(async()=>{const fs=[...$('#f').files];if(!fs.length)throw new Error('Pehle photo ya PDF chuno');
  const isP=f=>/\.pdf$/i.test(f.name)||f.type=='application/pdf';if(fs.length>1&&fs.some(isP))throw new Error('PDF ek baar me ek hi. Photos kai ek saath chal sakti hain.');
- const lang=$('#rb_l').value,dpi=+$('#rb_q').value,psm=+$('#rb_m').value||0,jobs=await p8Jobs(fs,$('#rb_r').value.trim(),20),str=$('#rb_s').checked,cln=$('#rb_c').checked,wL=$('#rb_t').checked,wI=$('#rb_i').checked,wB=$('#rb_b').checked,wO=$('#rb_o').checked,wK=$('#rb_k').checked,hin=/hin/.test(lang);
- await PL();const F=PDFLib,out=await F.PDFDocument.create(),hv=await out.embedFont(F.StandardFonts.Helvetica),hb=await out.embedFont(F.StandardFonts.HelveticaBold);let hf=null,hnote='',hfT=false;
+ const lang=$('#rb_l').value,dpi=+$('#rb_q').value,psm=+$('#rb_m').value||0,jobs=await p8Jobs(fs,$('#rb_r').value.trim(),20),str=$('#rb_s').checked,cln=$('#rb_c').checked,wL=$('#rb_t').checked,wI=$('#rb_i').checked,wB=$('#rb_b').checked,wO=$('#rb_o').checked,wK=$('#rb_k').checked,wX=$('#rb_x').checked,hyb=$('#rb_h').value=='1',hin=/hin/.test(lang);
+ await PL();const F=PDFLib,out=await F.PDFDocument.create(),hv=await out.embedFont(F.StandardFonts.Helvetica),hb=await out.embedFont(F.StandardFonts.HelveticaBold),hvi=await out.embedFont(F.StandardFonts.HelveticaOblique),hbi=await out.embedFont(F.StandardFonts.HelveticaBoldOblique);let hf=null,hnote='',hfT=false;
  const loadHf=async()=>{if(hf||hfT)return;hfT=true;try{await RBFK();out.registerFontkit(fontkit);const r=await fetch(RBHI);if(!r.ok)throw 0;hf=await out.embedFont(await r.arrayBuffer(),{subset:true})}catch(z){hf=null;hnote=' · Hindi/₹ font load nahi hua, un words ke symbols chhoot gaye (internet chahiye)'}};
  if(hin)await loadHf();
  const can=t=>/^[\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]*$/.test(t);let w=null,nw=0,nl=0,ni=0,nk=0,fb=0,skipped=0,rot=[],thumb=null;
  const cap=F.LineCapStyle?{lineCap:F.LineCapStyle.Projecting}:{};
- try{w=await p8W(lang,psm);for(let k=0;k<jobs.length;k++){const j=jobs[k];p8Cur=(k+1)+'/'+jobs.length+' · '+j.label;
+ const FXR=[],CKR=[];try{w=await p8W(lang,psm);const sig=fs.map(f=>f.name+f.size).join()+[lang,dpi,psm,$('#rb_r').value,str,cln,wL,wX].join('|');if(!window.RBC||RBC.sig!==sig){window.RBC={sig,pg:{}};Object.keys(RBOV).forEach(k=>delete RBOV[k])}
+ for(let k=0;k<jobs.length;k++){const j=jobs[k];p8Cur=(k+1)+'/'+jobs.length+' · '+j.label;
   let c=await p8Cv(j,dpi/72),pw;if(j.pdf){const vp=(await j.pdf.getPage(j.pg)).getViewport({scale:1});pw=vp.width}else pw=595.28;
   let ang=0;if(str){ang=rbSkew(c);if(Math.abs(ang)>=.5){const c2=rbRot(c,ang);c.width=c.height=0;c=c2}else ang=0}rot.push(ang);
-  const oc=cln?rbClean(c):c,r=await w.recognize(oc,{},{text:true,tsv:true,blocks:true});if(oc!==c)oc.width=oc.height=0;
-  const WD=rbDedupe(rbWords(r.data).filter(q=>!/^[|¦]+$/.test(q.t.trim()))),L=rbLines2(WD),K=pw/c.width,H=c.height*K,page=out.addPage([c.width*K,H]);
-  if(!hf&&!hfT&&WD.some(q=>!can(q.t.trim())))await loadHf();
-  const ink=rbInk(c),CW=c.width,CH=c.height;
+  const ink=rbInk(c),CW=c.width,CH=c.height,K=pw/c.width,H=c.height*K;
+  let WD;const hit=RBC.pg[k];
+  if(hit)WD=hit.map(q=>({...q}));
+  else{const oc=cln?rbClean(c):(()=>{const o=cv(c.width,c.height);o.getContext('2d').drawImage(c,0,0);return o})();
+   if(wL){try{const pl=rbFindLines(ink.lin,c.width,c.height),ox=oc.getContext('2d');ox.fillStyle='#fff';
+    pl.h.forEach(s=>ox.fillRect(s.a-1,s.p-s.t/2-2,s.b-s.a+2,s.t+4));pl.v.forEach(s=>ox.fillRect(s.p-s.t/2-2,s.a-1,s.t+4,s.b-s.a+2))}catch(z){}}
+   const r=await w.recognize(oc,{},{text:true,tsv:true,blocks:true});if(oc!==c)oc.width=oc.height=0;
+   WD=rbDedupe(rbWords(r.data).filter(q=>!/^[|¦]+$/.test(q.t.trim())));
+   if(wX){try{let l0={h:[],v:[]};if(wL){l0=rbFindLines(ink.lin,CW,CH);rbCleanLines(l0,WD)}await rbRe(w,c,ink,l0,WD,psm)}catch(z){}}
+   RBC.pg[k]=WD.map(q=>({...q}))}
+  const page=out.addPage([c.width*K,H]);
   let lines={h:[],v:[]};if(wL){lines=rbFindLines(ink.lin,CW,CH);rbCleanLines(lines,WD)}
-  WD.forEach(q=>{q.t=q.t.trim();q.dash=/^[-_=~\u2014\u2013]{4,}$/.test(q.t);q.lo=wK&&!q.dash&&q.c<45;q.col=(wO||wB)?rbWordCol(ink.d,CW,CH,q):null;q.st=wB?rbStroke(ink.dark,CW,CH,q):0});
+  const L=rbLines2(WD);
+  rbFix(WD,L,k+1,FXR,CKR);rbOv(WD,k+1);
+  if(!hf&&!hfT&&WD.some(q=>!can(q.t.trim())))await loadHf();
+  if(hyb){try{const jb=new Uint8Array(await(await toB(c,'image/jpeg',.9)).arrayBuffer()),im=await out.embedJpg(jb);page.drawImage(im,{x:0,y:0,width:c.width*K,height:H})}catch(z){}}
+  WD.forEach(q=>{q.t=q.t.trim();q.dash=/^[-_=~\u2014\u2013]{4,}$/.test(q.t);q.lo=wK&&!q.dash&&!q.ver&&(q.c<45||q.chk);q.col=(wO||wB)?rbWordCol(ink.d,CW,CH,q):null;q.st=wB?rbStroke(ink.dark,CW,CH,q):0;q.it=(wB&&!hyb&&q.t.length>=3)?rbItal(ink.dark,CW,CH,q):0});
   const bgs=WD.filter(q=>q.col).map(q=>q.col.bg),paper=bgs.length?[0,1,2].map(i=>rbMed(bgs.map(b=>b[i]))):[255,255,255];
   /* 1. images (bottom layer) */
-  if(wI){const bl=rbBlobs(ink.any,CW,CH,WD,lines);
+  if(wI&&!hyb){const bl=rbBlobs(ink.any,CW,CH,WD,lines);
    for(const b of bl){try{const cr=await rbCrop(c,b,WD,lines),im=cr.png?await out.embedPng(cr.bytes):await out.embedJpg(cr.bytes);page.drawImage(im,{x:b.x*K,y:H-(b.y+b.h)*K,width:b.w*K,height:b.h*K});ni++}catch(z){}}}
   /* 2. coloured bars behind text (header bands) */
-  if(wO)for(const l of L){let run=null;const flush=()=>{if(run){page.drawRectangle({x:run.x0*K,y:H-run.y1*K,width:(run.x1-run.x0)*K,height:(run.y1-run.y0)*K,color:F.rgb(run.r/255,run.g/255,run.b/255),borderWidth:0});run=null}};
+  if(wO&&!hyb)for(const l of L){let run=null;const flush=()=>{if(run){page.drawRectangle({x:run.x0*K,y:H-run.y1*K,width:(run.x1-run.x0)*K,height:(run.y1-run.y0)*K,color:F.rgb(run.r/255,run.g/255,run.b/255),borderWidth:0});run=null}};
    for(const q of l.w){const bg=q.col&&q.col.bg;if(!bg||rbDist(bg,paper)<75){flush();continue}
     if(run&&rbDist([run.r,run.g,run.b],bg)<35){run.x1=q.x1+2;run.y0=Math.min(run.y0,q.y0-2);run.y1=Math.max(run.y1,q.y1+2)}else{flush();run={x0:q.x0-2,x1:q.x1+2,y0:q.y0-2,y1:q.y1+2,r:bg[0],g:bg[1],b:bg[2]}}}flush()}
   /* 3. unsure words stay as a picture of the original */
-  if(wK){let cnt=0;for(const q of WD){if(!q.lo||cnt>=120)continue;try{const m=await rbWordImg(c,q);if(!m)continue;const im=await out.embedPng(m.bytes);page.drawImage(im,{x:m.x*K,y:H-(m.y+m.h)*K,width:m.w*K,height:m.h*K});cnt++;nk++}catch(z){}}}
+  if(wK&&!hyb){let cnt=0;for(const q of WD){if(!q.lo||cnt>=120)continue;try{const m=await rbWordImg(c,q);if(!m)continue;const im=await out.embedPng(m.bytes);page.drawImage(im,{x:m.x*K,y:H-(m.y+m.h)*K,width:m.w*K,height:m.h*K});cnt++;nk++}catch(z){}}}
   /* 4. table lines, vector, real colour */
   const lw=t=>Math.max(.4,Math.min(t,6)*K),rgbOf=a=>F.rgb(a[0]/255,a[1]/255,a[2]/255);
-  lines.h.forEach(s=>{page.drawLine({start:{x:s.a*K,y:H-s.p*K},end:{x:s.b*K,y:H-s.p*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,true)),...cap});nl++});
-  lines.v.forEach(s=>{page.drawLine({start:{x:s.p*K,y:H-s.a*K},end:{x:s.p*K,y:H-s.b*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,false)),...cap});nl++});
+  if(!hyb)lines.h.forEach(s=>{page.drawLine({start:{x:s.a*K,y:H-s.p*K},end:{x:s.b*K,y:H-s.p*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,true)),...cap});nl++});
+  if(!hyb)lines.v.forEach(s=>{page.drawLine({start:{x:s.p*K,y:H-s.a*K},end:{x:s.p*K,y:H-s.b*K},thickness:lw(s.t),color:rgbOf(rbLineCol(ink,s,false)),...cap});nl++});
   /* 5. text: size from the line, width stretched to the exact box, own colour and weight */
-  for(const l of L){
-   const asc=l.w.filter(q=>RBASC.test(q.t)&&!q.lo),use=(asc.length?asc:l.w).map(q=>l.base-q.y0).sort((a,b)=>a-b),capH=use[Math.min(use.length-1,Math.floor(use.length*.75))],lsz=Math.max(3,capH*K/.74);
-   const sts=l.w.filter(q=>q.st>0);let lineBold=false;
+  const LC=rbCells(WD,lines);
+  LC.forEach(l=>{const asc=l.w.filter(q=>RBASC.test(q.t)&&!q.lo),use=(asc.length?asc:l.w).map(q=>l.base-q.y0).sort((a,b)=>a-b),capH=use[Math.min(use.length-1,Math.floor(use.length*.75))];l.z=Math.max(3,capH*K/.74)});
+  {const o=LC.map((l,i)=>i).sort((a,b)=>LC[a].z-LC[b].z);let g=[];const fl=()=>{if(g.length){const m=rbMed(g.map(i=>LC[i].z));g.forEach(i=>LC[i].sz=m)}g=[]};o.forEach(i=>{if(g.length&&LC[i].z>LC[g[0]].z*1.12)fl();g.push(i)});fl()}
+  for(const l of LC){
+   const lsz=l.sz||l.z;
+   const sts=l.w.filter(q=>q.st>0);let lineBold=false;const itq=l.w.filter(q=>q.t.length>=3),lineIt=itq.length>0&&itq.filter(q=>q.it).length>=itq.length*.6;
    if(wB&&sts.length>=3){const g=ink._gm||(ink._gm=rbMed(WD.filter(q=>q.st>0).map(q=>q.st)));lineBold=sts.filter(q=>q.st>g*1.3).length>=sts.length*.6}
    const gmed=wB?(ink._gm||(ink._gm=rbMed(WD.filter(q=>q.st>0).map(q=>q.st))||0)):0;
    for(const wd of l.w){const t=wd.t,bw=(wd.x1-wd.x0)*K,col=wd.col?wd.col.fg:[0,0,0],clr=rgbOf(col);
-    if(wd.lo)continue;
-    if(wd.dash){const yy=(wd.y0+wd.y1)/2,th=Math.max(.4,Math.min(2.5,(wd.y1-wd.y0)*K));page.drawLine({start:{x:wd.x0*K,y:H-yy*K},end:{x:wd.x1*K,y:H-yy*K},thickness:th,color:clr});nl++;continue}
-    const bold=wB&&(lineBold||(gmed&&wd.st>gmed*1.3&&wd.st-gmed>.025&&t.length>=2));let f=null,tx=t,isH=false;
-    if(can(t))f=bold?hb:hv;else if(hf){f=hf;isH=true;tx=t.replace(/[\u200B-\u200F]/g,'')}else{tx=t.replace(/[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]/g,'');f=hv;if(!tx){skipped++;continue}}
+    const inv=hyb||!!wd.lo;if(inv&&!(F.setTextRenderingMode&&F.TextRenderingMode))continue;
+    if(wd.dash){if(hyb)continue;const yy=(wd.y0+wd.y1)/2,th=Math.max(.4,Math.min(2.5,(wd.y1-wd.y0)*K));page.drawLine({start:{x:wd.x0*K,y:H-yy*K},end:{x:wd.x1*K,y:H-yy*K},thickness:th,color:clr});nl++;continue}
+    const bold=wB&&(lineBold||(gmed&&wd.st>gmed*1.3&&wd.st-gmed>.025&&t.length>=2));const ital=wB&&!hyb&&(lineIt||wd.it);let f=null,tx=t,isH=false;
+    if(can(t))f=ital?(bold?hbi:hvi):(bold?hb:hv);else if(hf){f=hf;isH=true;tx=t.replace(/[\u200B-\u200F]/g,'')}else{tx=t.replace(/[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]/g,'');f=hv;if(!tx){skipped++;continue}}
     const wb=(Math.abs(wd.y1-l.base)<l.h*.3&&!/[gjpqyQ,;()\[\]{}|]/.test(t))?wd.y1:l.base;
-    let sz=lsz;if(isH)sz=Math.max(3,(wd.y1-wd.y0)*K/1.05);else if(RBASC.test(t)){const own=(wb-wd.y0)*K/.74;if(own>0&&Math.abs(own/lsz-1)>.22)sz=own}
+    let sz=lsz;if(isH)sz=Math.max(3,(wd.y1-wd.y0)*K/1.05);else if(RBASC.test(t)){const own=(wb-wd.y0)*K/.74;if(own>0&&Math.abs(own/lsz-1)>.3)sz=own}
     sz=Math.max(3,Math.min(sz,200));
     let w1;try{w1=f.widthOfTextAtSize(tx,sz)}catch(z){skipped++;continue}if(!w1)continue;
-    let sx=bw/w1;sx=Math.max(.4,Math.min(2.5,sx));if(Math.abs(sx-1)<.03)sx=1;
+    let sx=bw/w1;if(hyb)sx=Math.max(.3,Math.min(3,sx));else if(sx<.9){sz=Math.max(sz*.72,sz*sx/.9);try{const w2=f.widthOfTextAtSize(tx,sz);if(w2)sx=Math.max(.9,Math.min(1.1,bw/w2))}catch(z){sx=.9}}else if(sx>1.1)sx=1.1;if(Math.abs(sx-1)<.03)sx=1;
     const px=wd.x0*K,py=H-wb*K;
-    try{page.setFont(f);const fk=page.getFont()[1];page.pushOperators(F.pushGraphicsState(),F.beginText(),F.setFillingColor(clr),F.setFontAndSize(fk,sz),F.setTextMatrix(sx,0,0,1,px,py),F.showText(f.encodeText(tx)),F.endText(),F.popGraphicsState());nw++}
-    catch(z){try{page.drawText(tx,{x:px,y:py,size:Math.max(3,Math.min(sz,sz*sx)),font:f,color:clr});nw++;fb++}catch(z2){skipped++}}}}
+    try{page.setFont(f);const fk=page.getFont()[1];page.pushOperators(F.pushGraphicsState(),F.beginText(),...(inv?[F.setTextRenderingMode(F.TextRenderingMode.Invisible)]:[]),F.setFillingColor(clr),F.setFontAndSize(fk,sz),F.setTextMatrix(sx,0,0,1,px,py),F.showText(f.encodeText(tx)),F.endText(),F.popGraphicsState());nw++}
+    catch(z){if(inv)continue;try{page.drawText(tx,{x:px,y:py,size:Math.max(3,Math.min(sz,sz*sx)),font:f,color:clr});nw++;fb++}catch(z2){skipped++}}}}
   if(k==0){const s=Math.min(1,700/c.width),t=drw(c,Math.round(c.width*s),Math.round(c.height*s),'image/jpeg');thumb=t.toDataURL('image/jpeg',.75);t.width=t.height=0}
   c.width=c.height=0}}finally{await p8End(w)}
  if(!nw&&!nl&&!ni&&!nk)throw new Error('Kuch nahi mila. Scan saaf, seedha aur bhasha sahi chuni ho, phir try karo.');
  const blob=await sv(out),tot=fs.reduce((s,f)=>s+f.size,0),sk=rot.filter(a=>a).length;
- showOut([{name:bn(fs[0].name)+'_rebuilt.pdf',blob,o:tot,note:jobs.length+' page · '+nw+' words · '+nl+' lines · '+ni+' images'+(nk?' · '+nk+' shak wale words image rakhe':'')+(sk?' · '+sk+' page seedha kiya':'')+(skipped?' · '+skipped+' words chhoot gaye':'')+(fb?' · '+fb+' words simple mode me':'')+hnote}]);
+ showOut([{name:bn(fs[0].name)+'_rebuilt.pdf',blob,o:tot,note:jobs.length+' page · '+nw+' words · '+nl+' lines · '+ni+' images'+(nk?' · '+nk+' shak wale words image rakhe':'')+(sk?' · '+sk+' page seedha kiya':'')+(skipped?' · '+skipped+' words chhoot gaye':'')+(fb?' · '+fb+' words simple mode me':'')+(hyb?' · hybrid (asli image + invisible text)':'')+hnote}]);
+ rbReport(FXR,CKR);
  try{const pdf=await pOpen(new Uint8Array(await blob.arrayBuffer())),pc=await pRender(await pdf.getPage(1),1.4),u=pc.toDataURL('image/png');pc.width=pc.height=0;
   const el=document.querySelector('#tr');if(el)el.insertAdjacentHTML('beforeend',`<section class="card"><h3>Pehle aur baad (page 1)</h3><p class="mu">Left: asli. Right: naya rebuilt PDF. Zoom karke dekho, text aur lines clear rehti hain.</p><div style="display:flex;gap:8px"><img src="${thumb}" style="width:50%;min-width:0;border-radius:8px;border:1px solid #8884"><img src="${u}" style="width:50%;min-width:0;border-radius:8px;border:1px solid #8884;background:#fff"></div></section>`)}catch(z){}});
 
-V.rb=['Rebuild PDF',()=>`${fin('image/*,application/pdf,.pdf',1)}<div class="grid"><label>Bhasha<select id="rb_l">${P8L}</select></label><label>OCR quality<select id="rb_q"><option value="200">Achhi (200 dpi)</option><option value="150">Normal (150 dpi)</option><option value="300">Bahut achhi, dheere (300 dpi)</option></select></label><label>Layout<select id="rb_m"><option value="0">Auto</option><option value="6">Bill / ek block</option><option value="4">Ek column</option><option value="11">Bikhra text</option></select></label><label>PDF pages (khali = sab)<input id="rb_r" placeholder="all"></label></div>${[['s','Tedhi photo ya scan khud seedha karo'],['c','Padhne se pehle image saaf karo (contrast)'],['t','Table ke box aur lines vector me banao'],['i','Logo, stamp, photo, signature original se crop karke lagao'],['b','Bold text pehchano'],['o','Text ka rang aur rang wali patti (header bar) pehchano'],['k','Jin words par OCR ko bharosa nahi, unhe image rakho (galat text na bane)']].map(a=>`<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="rb_${a[0]}" checked style="width:auto;margin:0"> ${a[1]}</label>`).join('')}<div class="row"><button onclick="rbRun()">Rebuild PDF banao</button></div><p class="mu">OCR se har word uski jagah par asli text ban jata hai (zoom me nahi phatta, select/copy hota hai). Table ki seedhi lines pakad kar vector box ban jate hain aur columns saaf aligned rehte hain. Logo, stamp, photo aur signature original image se crop hokar wahin lagte hain, to wo asli jaise dikhte hain par zoom me utne hi sharp jitni scan thi. Font nearest standard font hoga, exact nahi. Bina lines wali table me sirf text aligned rehta hai, box nahi banta. Rang wali patti tabhi aati hai jab wo kagaz ke rang se kaafi alag ho. Ek baar me 20 pages tak. OCR engine pehli baar download hota hai.</p>`];
+V.rb=['Rebuild PDF',()=>`${fin('image/*,application/pdf,.pdf',1)}<div class="grid"><label>Bhasha<select id="rb_l">${P8L}</select></label><label>OCR quality<select id="rb_q"><option value="200">Achhi (200 dpi)</option><option value="150">Normal (150 dpi)</option><option value="300">Bahut achhi, dheere (300 dpi)</option></select></label><label>Layout<select id="rb_m"><option value="0">Auto</option><option value="6">Bill / ek block</option><option value="4">Ek column</option><option value="11">Bikhra text</option></select></label><label>PDF pages (khali = sab)<input id="rb_r" placeholder="all"></label><label>Mode<select id="rb_h"><option value="0">Clean rebuild (naya text + vector)</option><option value="1">Hybrid (asli jaisa look + invisible text)</option></select></label></div>${[['s','Tedhi photo ya scan khud seedha karo'],['c','Padhne se pehle image saaf karo (contrast)'],['t','Table ke box aur lines vector me banao'],['i','Logo, stamp, photo, signature original se crop karke lagao'],['b','Bold aur italic text pehchano'],['o','Text ka rang aur rang wali patti (header bar) pehchano'],['k','Jin words par OCR ko bharosa nahi, unhe image rakho (galat text na bane)'],['x','Bade ya shak wale words (jaise table header) alag se dobara padho']].map(a=>`<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="rb_${a[0]}" checked style="width:auto;margin:0"> ${a[1]}</label>`).join('')}<div class="row"><button onclick="rbRun()">Rebuild PDF banao</button></div><p class="mu">OCR se har word uski jagah par asli text ban jata hai (zoom me nahi phatta, select/copy hota hai). Table ki seedhi lines pakad kar vector box ban jate hain aur columns saaf aligned rehte hain. Logo, stamp, photo aur signature original image se crop hokar wahin lagte hain, to wo asli jaise dikhte hain par zoom me utne hi sharp jitni scan thi. Font nearest standard font hoga, exact nahi. Bina lines wali table me sirf text aligned rehta hai, box nahi banta. Rang wali patti tabhi aati hai jab wo kagaz ke rang se kaafi alag ho. Ek baar me 20 pages tak. Hybrid me asli image peeche rehti hai, to look, ₹, header, bold sab bilkul asli jaisa; text invisible hai aur select/copy/search chalta hai. OCR engine pehli baar download hota hai.</p>`];
 
 lgApply();
 
