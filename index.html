@@ -268,7 +268,7 @@ const sol=d.solar;delete d.solar;const pin=S.pin;S=migrate(d);if(pin)S.pin=pin;e
 function restoreFile(i){const f=i.files&&i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#bk').value=r.result;restore()};r.readAsText(f);i.value=''}
 function wipe(){if(confirm('Erase all meters, cycles and payments?')&&confirm('This cannot be undone. Continue?')){try{localStorage.setItem(K+'_prev',JSON.stringify(S))}catch(x){}S=migrate({meters:[],cycles:[],cur:'₹',theme:'auto'});save();go()}}
 const rateSet=()=>`<section class="card"><h3>Rate aur borewell rule</h3><p class="mu">Naye cycles pe lagega. Actual rate = actual bill ÷ main units. Apna rate khali ho to actual hi lagega. Borewell ka fixed share sirf renters se.</p><label>Borewell share, har renter (₹)<input type="number" step="any" value="${e(S.bwShare==null?500:S.bwShare)}" oninput="S.bwShare=this.value;save()"></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.ownActual!==false?'checked':''} onchange="S.ownActual=this.checked;save()"> Owner pe actual rate lagao</label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.showActual?'checked':''} onchange="S.showActual=this.checked;save()"> Show actual (sab asli rate pe, borewell asli kharche se)</label></section>`;
-const sets=()=>setsBase()+rateSet()+marginSet()+pinCard();
+const sets=()=>setsBase()+rateSet()+marginSet()+pinCard()+(window.CLD?CLD.card():'');
 function toggleOff(id){const m=S.meters.find(x=>x.id==id);if(!m)return;m.off=!m.off;save();go()}
 function go(){$('#v').innerHTML=tab=='home'?home():tab=='meters'?(mid?rec():meters()):tab=='cycles'?(cid?cyc():cycles()):tab=='tools'?tools():tab=='more'?(window.SOL?SOL.view():''):sets();
 bkNote();$('#nav').innerHTML=T.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';cid=mid=null;tl=null;go();scrollTo(0,0)"><i>${t[1]}</i>${t[2]}</button>`).join('');out()}
@@ -2469,5 +2469,103 @@ function wipe(){
 function exp(){return D}
 function imp(o){const er=checkBk(o);if(er){alert('Backup me solar data galat tha, solar restore nahi hua: '+er);return}try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}D=Object.assign(defD(),o);D.flags=D.flags||{};D.payments=D.payments||[];sv()}
 return{exp,imp,view,open,back,chD,setD,setM,setR,roll,mForm,mSave,mDel,payForm,paySave,payList,payDel,pdfBill,setP,backup,csv,restoreFile,wipe,closeD}
+})();
+</script><script>/* ===== Cloud sync (Supabase) : login + auto save/load, local-first. Token/session backup me nahi jata ===== */
+window.CLD=(()=>{
+const CFG={url:'https://qiaxmsqsvrkpeybropau.supabase.co',key:'sb_publishable_PWpJGjLJ2olYnKoyhCmdYA_h6b5E7is'},SK='bijli_cloud_v1';
+const cfgOk=()=>/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(CFG.url)&&String(CFG.key).length>20;
+let ss=null,busy=0,conflict=0,ready=0,last=null,pend=null,msg='',bad=0;
+try{ss=JSON.parse(localStorage.getItem(SK))}catch(x){}
+const persist=()=>{try{ss?localStorage.setItem(SK,JSON.stringify(ss)):localStorage.removeItem(SK)}catch(x){}};
+const canon=o=>o===null||typeof o!='object'?JSON.stringify(o):Array.isArray(o)?'['+o.map(canon).join(',')+']':'{'+Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+canon(o[k])).join(',')+'}';
+const payloadObj=()=>{const o=JSON.parse(bkJson());delete o.lastBk;return o};
+const hasData=()=>{try{return (S.meters&&S.meters.length)||(S.cycles&&S.cycles.length)||((S.solar&&S.solar.meters)||[]).length||(window.SOL&&SOL.exp().meters.length)}catch(x){return false}};
+const hm=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+function setSt(t,b){msg=t;bad=b?1:0;const p=$('#cl_st');if(p){p.textContent=t;p.className=b?'w':'mu'}}
+
+async function sb(path,o){
+ o=o||{};const auth=o.auth!==false,h={apikey:CFG.key,'Content-Type':'application/json'};
+ if(auth){await fresh();h.Authorization='Bearer '+ss.at}
+ const r=await fetch(CFG.url+path,{method:o.method||'GET',headers:h,body:o.body===undefined?undefined:JSON.stringify(o.body)});
+ let j=null;try{j=await r.json()}catch(x){}
+ if(!r.ok)throw new Error((j&&(j.msg||j.message||j.error_description||j.error))||('HTTP '+r.status));
+ return j}
+function setSess(j,email){ss=Object.assign(ss||{},{at:j.access_token,rt:j.refresh_token,exp:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600),email:(j.user&&j.user.email)||email||(ss&&ss.email)||''});if(ss.auto===undefined)ss.auto=true;persist()}
+async function fresh(){
+ if(!ss||!ss.rt)throw new Error('Dobara login karo');
+ if(ss.exp-60>Date.now()/1000)return;
+ let r,j=null;try{r=await fetch(CFG.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:CFG.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:ss.rt})});j=await r.json()}catch(x){throw new Error('Internet nahi hai')}
+ if(!r.ok||!j.access_token){if(r.status==400||r.status==401||r.status==403){ss=null;persist()}throw new Error('Session khatam, dobara login karo')}
+ setSess(j)}
+
+async function auth(kind){
+ const em=($('#cl_e').value||'').trim(),pw=$('#cl_p').value||'';
+ if(!em||pw.length<6){alert('Email aur kam se kam 6 akshar ka password dalo');return}
+ if(busy)return;busy=1;setSt('Ruko...');
+ try{
+  const j=await sb(kind=='up'?'/auth/v1/signup':'/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:em,password:pw}});
+  if(!j.access_token){setSt('Account ban gaya. Email me confirm link aaya hoga, confirm karke Login dabao.');busy=0;return}
+  ss=null;setSess(j,em);ss.rev=0;persist();busy=0;await startup();go()
+ }catch(x){setSt((kind=='up'?'Account nahi bana: ':'Login nahi hua: ')+x.message,1)}
+ finally{busy=0}}
+function logout(){if(!confirm('Logout karein? Phone ka data waisa hi rahega, bas cloud sync band hoga.'))return;ss=null;ready=0;last=null;conflict=0;persist();msg='';go()}
+
+async function getRemote(){const j=await sb('/rest/v1/app_data?select=data,rev,updated_at');return{row:(j&&j[0])||null}}
+
+async function push(manual,force){
+ if(busy||!ss||!ss.at)return;busy=1;
+ try{
+  const o=payloadObj(),lc=canon(o),r=await getRemote(),have=r.row?r.row.rev:0;
+  let expected=have;
+  if(r.row&&!force&&have!==(ss.rev||0)){conflict=1;setSt('Cloud me kisi aur phone se badlav hua hai. Neeche se "Cloud se load" ya "Phone ka data cloud me daalo" chuno.',1);return}
+  const nv=await sb('/rest/v1/rpc/app_save',{method:'POST',body:{p_data:o,p_expected_rev:expected}});
+  if(nv===-1){conflict=1;setSt('Conflict: cloud me data badal chuka hai. Load ya overwrite chuno.',1);return}
+  ss.rev=nv;persist();last=lc;conflict=0;S.lastBk=Date.now();save();setSt('Cloud me save ho gaya ✓ '+hm())
+ }catch(x){setSt('Save nahi hua: '+x.message,1)}
+ finally{busy=0;draw()}}
+async function pull(skipAsk){
+ if(busy||!ss||!ss.at)return;busy=1;
+ try{
+  const r=await getRemote();if(!r.row){alert('Cloud me abhi koi data nahi hai. Pehle "Abhi save karo" dabao.');return}
+  const er=checkBk(r.row.data);if(er){alert('Cloud ka data sahi nahi hai: '+er);return}
+  if(!skipAsk&&!confirm('Cloud ka data load karein? Abhi ka data safety copy me rahega.'))return;
+  if(!$('#bk')){tab='set';go()}
+  $('#bk').value=JSON.stringify(r.row.data);
+  const oc=window.confirm;window.confirm=()=>true;try{restore()}finally{window.confirm=oc}
+  ss.rev=r.row.rev;persist();last=canon(payloadObj());conflict=0;setSt('Cloud se load ho gaya ✓ '+hm())
+ }catch(x){setSt('Load nahi hua: '+x.message,1)}
+ finally{busy=0;draw()}}
+async function overwrite(){if(!confirm('Cloud ka data hat jayega aur is phone ka data wahan chala jayega. Pakka?'))return;await push(true,true);go()}
+
+async function startup(){
+ if(!cfgOk()||!ss||!ss.at)return;
+ try{
+  const r=await getRemote(),lc=canon(payloadObj());
+  if(!r.row){ready=1;last=lc;if(hasData()){last=null;await push(false)}return}
+  const rc=canon(r.row.data);
+  if(rc===lc){ss.rev=r.row.rev;persist();last=lc;ready=1;setSt('Cloud se synced ✓ '+hm());return}
+  if(r.row.rev===(ss.rev||0)){ready=1;last=rc;await push(false);return}
+  if(!hasData()){await pull(true);ready=1;return}
+  ready=1;conflict=1;last=lc;
+  setSt('Cloud me is phone se alag data hai. Neeche "Cloud se load" ya "Phone ka data cloud me daalo" chuno.',1);
+  if(confirm('Cloud me is phone se alag data mila. Cloud wala load karein?\nOK = cloud se load (abhi ka data safety copy me rahega)\nCancel = abhi kuch mat karo')){conflict=0;await pull(true)}
+ }catch(x){setSt('Cloud se nahi juda: '+x.message,1)}finally{draw()}}
+async function tick(){
+ if(!cfgOk()||!ss||!ss.at||!ss.auto||!ready||busy||conflict||!navigator.onLine)return;
+ const lc=canon(payloadObj());
+ if(lc!==last&&lc===pend){await push(false)}
+ pend=lc}
+
+function draw(){const c=$('#cl_card');if(c&&tab=='set')c.outerHTML=card()}
+function card(){
+ let h='<section class="card" id="cl_card"><h3>Cloud sync (Supabase)</h3>';
+ if(!cfgOk())return h+'<p class="w">Cloud abhi set nahi hai (Supabase URL/key app me nahi daali gayi).</p></section>';
+ if(!ss||!ss.at){
+  return h+`<p class="mu">Login karo to Bijli Manager aur Solar ka data cloud me save hoga aur kisi bhi phone par login karke dikhega. Net na ho tab bhi app chalega, aur net aate hi sync ho jayega.</p><label>Email<input id="cl_e" type="email" autocomplete="username" value="${e(ss&&ss.email||'')}"></label><label>Password (6+ akshar)<input id="cl_p" type="password" autocomplete="current-password"></label><div class="row"><button onclick="CLD.auth('in')">Login</button><button class="g" onclick="CLD.auth('up')">Naya account</button></div><p class="${bad?'w':'mu'}" id="cl_st">${e(msg)}</p></section>`}
+ return h+`<p class="mu">Login: <b>${e(ss.email)}</b></p><label style="display:flex;gap:10px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto;margin:0" ${ss.auto?'checked':''} onchange="CLD.setAuto(this.checked)"> Auto sync (badlav par apne aap cloud me save)</label><div class="row"><button onclick="CLD.push(true)">⬆ Abhi save karo</button><button class="g" onclick="CLD.pull()">⬇ Cloud se load</button><button class="g" onclick="CLD.logout()">Logout</button></div>${conflict?'<div class="row"><button class="g" style="color:var(--bad)" onclick="CLD.overwrite()">Phone ka data cloud me daalo</button></div>':''}<p class="${bad?'w':'mu'}" id="cl_st">${e(msg||(ready?'Sync chalu hai':'Ruko...'))}</p></section>`}
+function setAuto(v){ss.auto=!!v;persist()}
+
+setTimeout(startup,2500);setInterval(tick,15000);
+return{card,auth,logout,push,pull,overwrite,setAuto,tick,startup}
 })();
 </script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script></body></html>
