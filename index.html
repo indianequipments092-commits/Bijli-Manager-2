@@ -189,7 +189,7 @@ function migrate(d){d.cur=d.cur||'₹';d.fav=Array.isArray(d.fav)?d.fav.filter(x
 if(!d.accounts.length)['Main Account','Renters','Owner','Borewell & Common'].forEach(n=>d.accounts.push({id:uid(),name:n}));
 d.meters.forEach(m=>{if(!m.acc||!d.accounts.some(a=>a.id==m.acc))m.acc=d.accounts[{main:0,renter:1,owner:2,borewell:3,common:3}[m.type]||0].id});
 d.cycles.forEach(c=>{c.rd=c.rd||{}});return d}
-const bkJson=()=>{const o=Object.assign({},S);delete o.pin;return JSON.stringify(o)};
+const bkJson=()=>{const o=Object.assign({},S);delete o.pin;try{if(window.SOL)o.solar=SOL.exp()}catch(x){}return JSON.stringify(o)};
 function copyBk(){$('#bk').value=bkJson();$('#bk').select();try{navigator.clipboard&&navigator.clipboard.writeText($('#bk').value).catch(()=>{})}catch(x){}S.lastBk=Date.now();save();bkNote()}
 function dlBackup(){if(NAT()){nativeShare('bijli-backup-'+new Date().toISOString().slice(0,10)+'.json',bkJson(),true).then(()=>{S.lastBk=Date.now();save();bkNote()}).catch(()=>alert('Backup could not be shared. Try Copy backup text.'));return}const b=new Blob([bkJson()],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='bijli-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);S.lastBk=Date.now();save();bkNote()}
 function bkNote(){const n=$('#bkn');if(!n)return;const old=!S.lastBk||Date.now()-S.lastBk>7*864e5;n.innerHTML=S.meters&&S.meters.length&&old?'<div class="card" style="margin:8px 12px"><b>⚠ No backup in the last 7 days.</b> Data lives only in this browser.<div class="row"><button onclick="dlBackup()">Download backup</button></div></div>':''}
@@ -201,7 +201,7 @@ const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const TY={renter:['🏠','Renter'],owner:['👤','Landlord'],borewell:['💧','Borewell'],common:['💡','Common area'],main:['⚡','Main meter']};
 let tab='home',cid=null,mid=null;
-const T=[['home','📊','Home'],['meters','🔌','Meters'],['cycles','🗓️','Cycles'],['tools','🧰','Tools'],['set','⚙️','Settings']];
+const T=[['home','📊','Home'],['meters','🔌','Meters'],['cycles','🗓️','Cycles'],['tools','🧰','Tools'],['more','🧩','More'],['set','⚙️','Settings']];
 const cs=()=>[...S.cycles].sort((a,b)=>a.start<b.start?-1:1),cur=()=>S.cycles.find(x=>x.id==cid);
 function lbl(c){const[y,m]=c.start.split('-').map(Number),n=+c.months,d=new Date(y,m-1+n-1,1);const a=MN[m-1],b=MN[d.getMonth()];return n==1?a+' '+y:d.getFullYear()==y?a+'–'+b+' '+y:a+' '+y+'–'+b+' '+d.getFullYear()}
 function theme(){const t=S.theme,r=document.documentElement;t=='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',t)}
@@ -264,13 +264,13 @@ function restore(){let d;try{d=JSON.parse($('#bk').value)}catch(x){return alert(
 const er=checkBk(d);if(er)return alert('Backup rejected: '+er+'.');
 if(!confirm('Replace all current data with this backup ('+d.meters.length+' meters, '+d.cycles.length+' cycles)? Current data is kept as a safety copy first.'))return;
 try{localStorage.setItem(K+'_prev',JSON.stringify(S))}catch(x){}
-const pin=S.pin;S=migrate(d);if(pin)S.pin=pin;else delete S.pin;save();theme();go()}
+const sol=d.solar;delete d.solar;const pin=S.pin;S=migrate(d);if(pin)S.pin=pin;else delete S.pin;save();if(sol&&window.SOL)SOL.imp(sol);theme();go()}
 function restoreFile(i){const f=i.files&&i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#bk').value=r.result;restore()};r.readAsText(f);i.value=''}
 function wipe(){if(confirm('Erase all meters, cycles and payments?')&&confirm('This cannot be undone. Continue?')){try{localStorage.setItem(K+'_prev',JSON.stringify(S))}catch(x){}S=migrate({meters:[],cycles:[],cur:'₹',theme:'auto'});save();go()}}
 const rateSet=()=>`<section class="card"><h3>Rate aur borewell rule</h3><p class="mu">Naye cycles pe lagega. Actual rate = actual bill ÷ main units. Apna rate khali ho to actual hi lagega. Borewell ka fixed share sirf renters se.</p><label>Borewell share, har renter (₹)<input type="number" step="any" value="${e(S.bwShare==null?500:S.bwShare)}" oninput="S.bwShare=this.value;save()"></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.ownActual!==false?'checked':''} onchange="S.ownActual=this.checked;save()"> Owner pe actual rate lagao</label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.showActual?'checked':''} onchange="S.showActual=this.checked;save()"> Show actual (sab asli rate pe, borewell asli kharche se)</label></section>`;
 const sets=()=>setsBase()+rateSet()+marginSet()+pinCard();
 function toggleOff(id){const m=S.meters.find(x=>x.id==id);if(!m)return;m.off=!m.off;save();go()}
-function go(){$('#v').innerHTML=tab=='home'?home():tab=='meters'?(mid?rec():meters()):tab=='cycles'?(cid?cyc():cycles()):tab=='tools'?tools():sets();
+function go(){$('#v').innerHTML=tab=='home'?home():tab=='meters'?(mid?rec():meters()):tab=='cycles'?(cid?cyc():cycles()):tab=='tools'?tools():tab=='more'?(window.SOL?SOL.view():''):sets();
 bkNote();$('#nav').innerHTML=T.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';cid=mid=null;tl=null;go();scrollTo(0,0)"><i>${t[1]}</i>${t[2]}</button>`).join('');out()}
 
 function hero(){const L=cs(),rn=S.meters.filter(m=>m.type=='renter'),tot=rn.reduce((a,m)=>a+Math.max(0,dues(m).d),0),bill=L.reduce((a,c)=>a+calc(c).bl.filter(x=>x.m.type=='renter').reduce((q,x)=>q+x.amt,0),0),p=bill?Math.max(0,Math.min(1,1-tot/bill)):0,t=f(Math.round(tot),0);
@@ -2248,4 +2248,226 @@ new MutationObserver(done).observe(document.body,{childList:true,subtree:true});
 })();
 
 theme();go();
+</script><style>.sl-sub{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}.sl-sub button{padding:8px 2px;font-size:11px;border-radius:12px;min-width:0}.sl-sub button i{display:block;font-style:normal;font-size:17px}</style><script>/* ===== More > Solar Units (added module, own storage key, does not touch Bijli data) ===== */
+window.SOL=(()=>{
+const KEY='bijli_solar_v1',IDR=/^[A-Za-z0-9_-]{1,40}$/;
+const defD=()=>({plant:'Mera Solar Plant',cap:'',rate:8,alloc:false,meters:[],readings:{},flags:{},payments:[]});
+let D=load(),V=null,eDate=today(),mon=today().slice(0,7),_sf=0;
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&Array.isArray(d.meters))return Object.assign(defD(),d)}catch(x){}return defD()}
+function sv(){try{localStorage.setItem(KEY,JSON.stringify(D));_sf=0}catch(x){if(!_sf){_sf=1;alert('Solar data SAVE nahi hua. Storage full ya blocked hai. Abhi backup le lo.')}}}
+
+/* ---- dates ---- */
+function today(){return new Date().toLocaleDateString('en-CA')}
+function addDays(d,n){const[y,m,dd]=d.split('-').map(Number);return new Date(y,m-1,dd+n).toLocaleDateString('en-CA')}
+function diffDays(a,b){const g=s=>{const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((g(a)-g(b))/864e5)}
+const dmy=d=>{const q=String(d||'').split('-');return q.length==3?q[2]+'/'+q[1]+'/'+q[0]:(d||'-')};
+const MNF=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const mname=ym=>{const[y,m]=ym.split('-').map(Number);return MNF[m-1]+' '+y};
+function addMon(ym,n){const[y,m]=ym.split('-').map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+
+/* ---- core calculation ---- */
+const mainM=()=>D.meters.find(m=>m.type==='main');
+const custs=()=>D.meters.filter(m=>m.type==='cust'&&m.active!==false);
+const active=()=>[mainM(),...custs()].filter(Boolean).filter(m=>m.active!==false);
+const mtr=id=>D.meters.find(m=>m.id===id);
+const datesOf=id=>Object.keys(D.readings).filter(d=>D.readings[d][id]!==undefined).sort();
+function prevOf(id,date){const m=mtr(id),ds=datesOf(id).filter(d=>d<date);if(ds.length){const d=ds[ds.length-1];return{val:D.readings[d][id],date:d}}return{val:+m.opening||0,date:m.openDate||date}}
+function calc(id,date){
+ const r=D.readings[date]&&D.readings[date][id];if(r===undefined)return null;
+ const m=mtr(id),p=prevOf(id,date);let raw=r-p.val;
+ if(raw<0&&D.flags[date+'|'+id])raw=Math.pow(10,+m.digits||5)-p.val+r;
+ return{prev:p.val,cur:r,units:raw*(+m.mf||1),warn:raw<0,days:Math.max(1,diffDays(date,p.date)),pdate:p.date}}
+function monthUnits(id,ym){let t=0;datesOf(id).filter(d=>d.startsWith(ym)).forEach(d=>{const c=calc(id,d);if(c&&!c.warn)t+=c.units});return t}
+const custBase=ym=>custs().reduce((a,c)=>a+monthUnits(c.id,ym),0);
+function lossMonth(ym){const m=mainM();return m?Math.max(0,monthUnits(m.id,ym)-custBase(ym)):0}
+function billUnits(c,ym){const b=monthUnits(c.id,ym);if(!D.alloc)return b;const cb=custBase(ym);return cb>0?b+lossMonth(ym)*b/cb:b}
+const rateOf=c=>(c.rate!==''&&c.rate!=null&&!isNaN(+c.rate))?+c.rate:(+D.rate||0);
+const openYm=c=>(c.openDate||today()).slice(0,7);
+const billOf=(c,ym)=>ym<openYm(c)?0:billUnits(c,ym)*rateOf(c)+(+c.fixed||0);
+function allYms(c){const o=[];let y=openYm(c);const end=today().slice(0,7);while(y<=end){o.push(y);y=addMon(y,1)}return o}
+function balanceAt(c,ym){let b=0;allYms(c).filter(y=>y<=ym).forEach(y=>b+=billOf(c,y));D.payments.filter(p=>p.cid===c.id&&p.date.slice(0,7)<=ym).forEach(p=>b-=+p.amt);return b}
+const paidIn=(c,ym)=>D.payments.filter(p=>p.cid===c.id&&p.date.slice(0,7)===ym).reduce((a,p)=>a+ +p.amt,0);
+function missing(){const o=[];for(let i=1;i<=7;i++){const d=addDays(today(),-i),n=active().filter(m=>(m.openDate||'')<=d&&(D.readings[d]||{})[m.id]===undefined).map(m=>m.name);if(n.length)o.push({d,n})}return o}
+
+/* ---- shell ---- */
+const SUB=[['entry','📝','Aaj'],['dash','📊','Dashboard'],['cust','👥','Customers'],['bills','🧾','Bills'],['set','⚙️','Settings']];
+function view(){
+ if(!V)return hub();
+ const body={entry:vEntry,dash:vDash,cust:vCust,bills:vBills,set:vSet}[V]();
+ return`<div class="bar"><button class="g" onclick="SOL.back()">‹ Back</button><h2>☀️ Solar Units</h2><span></span></div>
+<div class="sl-sub">${SUB.map(t=>`<button class="${t[0]==V?'':'g'}" onclick="SOL.open('${t[0]}')"><i>${t[1]}</i>${t[2]}</button>`).join('')}</div>`+body}
+function hub(){return`<div class="bar"><h2>More</h2></div>
+<section class="card"><h3>Extra tools</h3><div class="grid"><button class="g" style="padding:14px 8px;text-align:center" onclick="SOL.open('entry')"><span style="font-size:22px;display:block">☀️</span>Solar Units</button></div></section>
+<p class="mu" style="text-align:center">Solar ka daily unit count, customer accounts aur bills. Ye data Bijli Manager ke main Backup me bhi aata hai.</p>`}
+function open(v){V=v;go();scrollTo(0,0)}
+function back(){V=null;go();scrollTo(0,0)}
+const empty=t=>`<section class="card" style="text-align:center"><p class="mu">${t}</p><div class="row" style="justify-content:center"><button onclick="SOL.open('cust')">Setup karo</button></div></section>`;
+
+/* ---- ENTRY ---- */
+function vEntry(){
+ const M=mainM();if(!M)return empty('Pehle <b>Main Meter</b> banao (solar ka total meter), fir customers add karo. Uske baad roz ki reading dalo.');
+ let h=`<section class="card"><div class="bar" style="margin:0"><button class="g" onclick="SOL.chD(-1)">‹</button><input type="date" id="so_d" value="${eDate}" max="${today()}" onchange="SOL.setD(this.value)" style="margin:0;text-align:center"><button class="g" onclick="SOL.chD(1)">›</button></div><p class="mu" style="text-align:center;margin:8px 0 0">${eDate==today()?'Aaj · ':''}${dmy(eDate)}</p></section>`;
+ h+=active().map(m=>{const p=prevOf(m.id,eDate),v=(D.readings[eDate]||{})[m.id];
+  return`<section class="card"><div class="bar" style="margin:0 0 8px"><b>${m.type=='main'?'☀️':'👤'} ${e(m.name)}</b><span class="mu">${m.type=='main'?'Main meter':'Customer'}${+m.mf&&+m.mf!==1?' · x'+e(m.mf):''}${m.mno?' · '+e(m.mno):''}</span></div>
+<div class="grid"><label>Previous (${dmy(p.date)})<div style="font-size:20px;font-weight:700;margin-top:8px">${f(p.val)}</div></label><label>Aaj ki reading<input type="number" inputmode="decimal" step="any" id="so_r_${m.id}" value="${v===undefined?'':v}" placeholder="Reading dalo" oninput="SOL.setR('${m.id}',this.value)"></label></div>
+<div id="so_c_${m.id}">${cardCalc(m,calc(m.id,eDate))}</div></section>`}).join('');
+ return h+`<section class="card" id="so_sum"></section>`}
+function cardCalc(m,c){
+ if(!c)return'<p class="mu" style="margin:8px 0 0">Reading baaki hai</p>';
+ let h=`<div class="bar" style="margin:8px 0 0"><span>Units: <b class="${c.warn?'w':'ok'}">${f(c.units)}</b>${c.days>1?` <span class="mu">(${c.days} din ka)</span>`:''}</span>${m.type=='cust'&&!c.warn?`<span>Amount <b>${$$(c.units*rateOf(m))}</b></span>`:''}</div>`;
+ if(c.warn)h+=`<p class="w" style="margin:8px 0 0">Aaj ki reading previous se kam hai. Galti ho to sahi karo. Meter 0 se ghoom ke shuru hua ho to rollover maano.</p><div class="row"><button class="g" onclick="SOL.roll('${m.id}')">Rollover maano</button></div>`;
+ return h}
+function roll(id){D.flags[eDate+'|'+id]=true;sv();go()}
+function setR(id,v){
+ delete D.flags[eDate+'|'+id];
+ if(v===''||isNaN(+v)){if(D.readings[eDate]){delete D.readings[eDate][id];if(!Object.keys(D.readings[eDate]).length)delete D.readings[eDate]}}
+ else(D.readings[eDate]=D.readings[eDate]||{})[id]=+v;
+ sv();const c=$('#so_c_'+id);if(c)c.innerHTML=cardCalc(mtr(id),calc(id,eDate));sumEntry()}
+function sumEntry(){
+ const box=$('#so_sum');if(!box)return;
+ const M=mainM(),mc=M&&calc(M.id,eDate),cs_=custs();let sum=0,done=0;
+ cs_.forEach(c=>{const x=calc(c.id,eDate);if(x&&!x.warn){sum+=x.units;done++}});
+ const pend=active().filter(m=>!calc(m.id,eDate)).length;
+ let h='<h3>Aaj ka hisaab</h3>';
+ if(mc&&!mc.warn){const diff=mc.units-sum,pct=mc.units>0?diff/mc.units*100:0;
+  h+=`<div class="kp"><div><small>Main meter units</small><b>${f(mc.units)}</b></div><div><small>Customers total (${done}/${cs_.length})</small><b>${f(sum)}</b></div><div><small>Farak / loss units</small><b class="${diff<0?'w':''}">${f(diff)}</b></div><div><small>Loss %</small><b class="${pct>15||pct<0?'w':''}">${f(pct,1)}%</b></div></div>`;
+  if(pend)h+=`<p class="mu">${pend} meter ki reading baaki hai, loss abhi poora nahi dikhega.</p>`;
+  if(pct<0)h+='<p class="w">Customers ke units main meter se zyada hain. Kisi reading me galti ho sakti hai.</p>'}
+ else h+='<p class="mu">Main meter ki reading dalo to loss / farak dikhega.</p>';
+ box.innerHTML=h}
+function chD(n){const d=addDays(eDate,n);if(d>today())return;eDate=d;go()}
+function setD(v){if(!v||v>today())return;eDate=v;go()}
+
+/* ---- DASHBOARD ---- */
+function vDash(){
+ const M=mainM();if(!M)return empty('Pehle Main Meter banao.');
+ const mu=monthUnits(M.id,mon),cb=custBase(mon),loss=Math.max(0,mu-cb),pct=mu>0?loss/mu*100:0,td=calc(M.id,today());
+ const series=datesOf(M.id).filter(d=>d.startsWith(mon)).map(d=>({d,u:(calc(M.id,d)||{}).units||0}));
+ const best=series.reduce((a,b)=>b.u>a.u?b:a,{u:0,d:''}),avg=series.length?mu/series.length:0,mx=Math.max(...series.map(x=>x.u),1);
+ let h=`<div class="bar"><button class="g" onclick="SOL.setM(-1)">‹</button><h2 style="font-size:18px">${mname(mon)}</h2><button class="g" onclick="SOL.setM(1)">›</button></div>
+<section class="card"><div class="kp"><div><small>Is mahine total (main meter)</small><b>${f(mu)}</b></div><div><small>Aaj ke units</small><b>${td?f(td.units):'-'}</b></div><div><small>Customers ne use kiye</small><b>${f(cb)}</b></div><div><small>Loss / common (${f(pct,1)}%)</small><b class="${pct>15?'w':''}">${f(loss)}</b></div><div><small>Daily average</small><b>${f(avg)}</b></div><div><small>Best din ${best.d?dmy(best.d):''}</small><b>${best.d?f(best.u):'-'}</b></div></div></section>
+<section class="card"><h3>Daily units</h3>${series.length?`<div class="sc"><div class="ch" style="height:auto;min-width:${Math.max(260,series.length*24)}px">${series.map(x=>`<div class="cl" title="${dmy(x.d)}: ${f(x.u)}"><small>${series.length<=14?Math.round(x.u):''}</small><div class="b"><span style="height:${Math.max(2,x.u/mx*100)}%"></span></div><small>${x.d.slice(8)}</small></div>`).join('')}</div></div>`:'<p class="mu">Is mahine ka data nahi.</p>'}</section>
+<section class="card"><h3>Customer-wise · ${mname(mon)}</h3><div class="sc"><table><tr><th>Naam</th><th>Units</th><th>Hissa</th><th>Bill</th></tr>${custs().map(c=>{const u=monthUnits(c.id,mon);return`<tr><td>${e(c.name)}</td><td>${f(u)}</td><td>${cb?f(u/cb*100,1):0}%</td><td>${$$(billOf(c,mon))}</td></tr>`}).join('')||'<tr><td colspan="4" class="mu">Koi customer nahi</td></tr>'}</table></div></section>`;
+ const ms=missing();
+ if(ms.length)h+=`<section class="card"><h3>Chhooti hui entries (last 7 din)</h3>${ms.map(x=>`<div class="li" style="cursor:pointer" onclick="eDate='${x.d}';SOL.open('entry')"><span>${dmy(x.d)}<br><span class="mu">${e(x.n.join(', '))}</span></span><span class="mu">Bharo ›</span></div>`).join('')}</section>`;
+ return h}
+function setM(n){mon=addMon(mon,n);go()}
+
+/* ---- CUSTOMERS / METERS ---- */
+function vCust(){
+ const M=mainM();
+ let h=`<div class="bar"><h2 style="font-size:18px">Meters</h2><span class="row" style="margin:0">${!M?'<button class="g" onclick="SOL.mForm(\'main\')">+ Main meter</button>':''}<button onclick="SOL.mForm(\'cust\')">+ Customer</button></span></div>`;
+ if(!D.meters.length)return h+'<section class="card"><p class="mu">Abhi kuch nahi hai. Pehle <b>Main Meter</b> (solar ka total meter) banao, fir har customer ka account.</p></section>';
+ h+=D.meters.slice().sort((a,b)=>(a.type=='main'?0:1)-(b.type=='main'?0:1)).map(m=>`<section class="card"><div class="bar" style="margin:0"><div><b>${m.type=='main'?'☀️':'👤'} ${e(m.name)}</b>${m.active===false?' <span class="mu">(band)</span>':''}<div class="mu">${m.type=='main'?'Main meter':'Customer'}${m.mno?' · Meter '+e(m.mno):''}<br>Opening ${f(m.opening)} (${dmy(m.openDate)})${m.type=='cust'?' · '+e(S.cur)+f(rateOf(m),3)+'/unit'+(+m.fixed?' + '+e(S.cur)+f(m.fixed)+'/mahina':''):''}${+m.mf&&+m.mf!==1?' · MF x'+e(m.mf):''}${m.phone?'<br>'+e(m.phone):''}</div></div><button class="g" onclick="SOL.mForm('${m.type}','${m.id}')">Edit</button></div></section>`).join('');
+ return h}
+function dlg(html){const d=$('#dg');d.innerHTML='<form method="dialog" onsubmit="return false">'+html+'</form>';d.returnValue='';d.onclose=null;d.showModal()}
+const closeD=()=>{const d=$('#dg');if(d.open)d.close()};
+function mForm(type,id){
+ const m=id?mtr(id):{type,name:'',mno:'',opening:'',openDate:today(),rate:'',fixed:'',mf:1,digits:5,phone:'',active:true};
+ dlg(`<h3>${id?'Edit':'Naya'} ${m.type=='main'?'main meter':'customer'}</h3>
+<label>Naam<input id="sf_n" value="${e(m.name)}" placeholder="${m.type=='main'?'Main solar meter':'Customer ka naam'}"></label>
+<label>Meter number (optional)<input id="sf_no" value="${e(m.mno)}"></label>
+<div class="grid"><label>Opening reading (abhi meter me)<input id="sf_o" type="number" step="any" inputmode="decimal" value="${e(m.opening)}"></label><label>Opening date<input id="sf_od" type="date" value="${e(m.openDate)}"></label></div>
+<div class="grid"><label>Multiplying factor (MF)<input id="sf_mf" type="number" step="any" value="${e(m.mf)}"></label><label>Meter digits (rollover)<input id="sf_dg" type="number" value="${e(m.digits||5)}"></label></div>
+${m.type=='cust'?`<div class="grid"><label>Rate / unit (khali = ${f(D.rate,3)})<input id="sf_r" type="number" step="any" value="${e(m.rate)}"></label><label>Fixed charge / mahina<input id="sf_f" type="number" step="any" value="${e(m.fixed)}"></label></div><label>Mobile (WhatsApp)<input id="sf_p" type="tel" value="${e(m.phone)}"></label>`:''}
+<label style="display:flex;gap:10px;align-items:center;margin-top:6px"><input type="checkbox" id="sf_a" style="width:auto;margin:0" ${m.active!==false?'checked':''}> Active</label>
+<div class="row"><button type="button" class="g" onclick="SOL.closeD()">Cancel</button>${id?`<button type="button" class="g" style="color:var(--bad)" onclick="SOL.mDel('${id}')">Delete</button>`:''}<button type="button" onclick="SOL.mSave('${m.type}','${id||''}')">Save</button></div>`)}
+function mSave(type,id){
+ const name=$('#sf_n').value.trim();if(!name){alert('Naam likho');return}
+ if(type=='main'&&!id&&mainM()){alert('Main meter pehle se hai');return}
+ const m=id?mtr(id):{id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),type};
+ Object.assign(m,{name,mno:$('#sf_no').value.trim(),opening:+$('#sf_o').value||0,openDate:$('#sf_od').value||today(),mf:+$('#sf_mf').value||1,digits:+$('#sf_dg').value||5,active:$('#sf_a').checked});
+ if(type=='cust'){m.rate=$('#sf_r').value;m.fixed=$('#sf_f').value;m.phone=$('#sf_p').value.trim()}
+ if(!id)D.meters.push(m);sv();closeD();go()}
+function mDel(id){
+ const m=mtr(id);if(!confirm(m.name+' ko, uski saari readings aur payments ke saath delete karein? Ye wapas nahi aayega.'))return;
+ D.meters=D.meters.filter(x=>x.id!==id);
+ Object.keys(D.readings).forEach(d=>{delete D.readings[d][id];if(!Object.keys(D.readings[d]).length)delete D.readings[d]});
+ D.payments=D.payments.filter(p=>p.cid!==id);sv();closeD();go()}
+
+/* ---- BILLS ---- */
+function billText(c){
+ const u=billUnits(c,mon),bill=billOf(c,mon),bal=balanceAt(c,mon),pb=balanceAt(c,addMon(mon,-1));
+ return`☀️ *${D.plant}*\nSolar bill - ${mname(mon)}\n\nNaam: ${c.name}\nUnits: ${f(u)}\nRate: ${S.cur}${f(rateOf(c),3)}/unit\nIs mahine ka bill: ${S.cur}${f(bill)}\nPichla baaki: ${S.cur}${f(pb)}\nMila: ${S.cur}${f(paidIn(c,mon))}\n*Total baaki: ${S.cur}${f(bal)}*\n\nDhanyavaad`}
+function vBills(){
+ const cs_=custs();let tb=0,tp=0,tbal=0;
+ let h=`<div class="bar"><button class="g" onclick="SOL.setM(-1)">‹</button><h2 style="font-size:18px">${mname(mon)}</h2><button class="g" onclick="SOL.setM(1)">›</button></div>`;
+ if(!cs_.length)return h+empty('Pehle customer add karo.');
+ const cards=cs_.map(c=>{
+  const u=billUnits(c,mon),en=u*rateOf(c),fx=mon<openYm(c)?0:(+c.fixed||0),bill=billOf(c,mon),paid=paidIn(c,mon),pb=balanceAt(c,addMon(mon,-1)),bal=balanceAt(c,mon);
+  tb+=bill;tp+=paid;tbal+=bal;
+  return`<section class="card"><div class="bar" style="margin:0 0 6px"><b>👤 ${e(c.name)}</b><b class="${bal>0.5?'w':'ok'}">${$$(bal)}</b></div>
+<div class="sc"><table><tr><td>Units${D.alloc?' (loss ke saath)':''}</td><td>${f(u)}</td></tr><tr><td>Energy (${f(u)} × ${f(rateOf(c),3)})</td><td>${$$(en)}</td></tr>${+c.fixed?`<tr><td>Fixed charge</td><td>${$$(fx)}</td></tr>`:''}<tr><td><b>Is mahine ka bill</b></td><td><b>${$$(bill)}</b></td></tr><tr><td>Pichla baaki</td><td>${$$(pb)}</td></tr><tr><td>Is mahine mile</td><td class="ok">- ${$$(paid)}</td></tr><tr><td><b>Total baaki</b></td><td><b>${$$(bal)}</b></td></tr></table></div>
+<div class="row"><button onclick="SOL.payForm('${c.id}')">+ Payment</button><button class="g" onclick="SOL.pdfBill('${c.id}')">PDF bill</button><a href="https://wa.me/${waNum(c.phone)}?text=${encodeURIComponent(billText(c))}" target="_blank" rel="noopener"><button class="am">WhatsApp</button></a><button class="g" onclick="SOL.payList('${c.id}')">Payments</button></div></section>`}).join('');
+ return h+`<section class="card"><div class="kp"><div><small>Total bill</small><b>${$$(tb)}</b></div><div><small>Mila</small><b>${$$(tp)}</b></div><div style="grid-column:1/-1"><small>Sab customers ka total baaki</small><b class="${tbal>0.5?'w':''}">${$$(tbal)}</b></div></div></section>`+cards}
+function payForm(cid){const c=mtr(cid);dlg(`<h3>Payment · ${e(c.name)}</h3><label>Amount<input id="sp_a" type="number" inputmode="decimal" step="any"></label><label>Date<input id="sp_d" type="date" value="${today()}"></label><label>Note (Cash / UPI)<input id="sp_n"></label><div class="row"><button type="button" class="g" onclick="SOL.closeD()">Cancel</button><button type="button" onclick="SOL.paySave('${cid}')">Save</button></div>`)}
+function paySave(cid){const a=+$('#sp_a').value;if(!(a>0)){alert('Amount dalo');return}D.payments.push({id:'p'+Date.now().toString(36),cid,date:$('#sp_d').value||today(),amt:a,note:$('#sp_n').value.trim()});sv();closeD();go()}
+function payList(cid){
+ const c=mtr(cid),l=D.payments.filter(p=>p.cid===cid).sort((a,b)=>b.date.localeCompare(a.date));
+ dlg(`<h3>Payments · ${e(c.name)}</h3>${l.length?l.map(p=>`<div class="li" style="cursor:default"><span>${dmy(p.date)}<br><span class="mu">${e(p.note||'')}</span></span><span><b>${$$(p.amt)}</b> <button type="button" class="g" onclick="SOL.payDel('${p.id}','${cid}')">✕</button></span></div>`).join(''):'<p class="mu">Koi payment nahi.</p>'}<div class="row"><button type="button" class="g" onclick="SOL.closeD()">Close</button></div>`)}
+function payDel(id,cid){if(!confirm('Ye payment delete karein?'))return;D.payments=D.payments.filter(p=>p.id!==id);sv();payList(cid);go()}
+
+/* ---- PDF bill (same look as Bijli Manager bills) ---- */
+function pdfBill(cid){
+ const c=mtr(cid),P=PDF(),Rs=n=>'Rs. '+f(n),cl=(t,n)=>String(t).slice(0,n);
+ const u=billUnits(c,mon),en=u*rateOf(c),fx=mon<openYm(c)?0:(+c.fixed||0),bill=billOf(c,mon),pb=balanceAt(c,addMon(mon,-1)),paid=paidIn(c,mon),bal=balanceAt(c,mon);
+ let y=0;
+ const np=()=>{P.add();y=50},
+ row=(r,w,h)=>{if(y>800)np();if(h)P.rect(36,y-11,523,18,'#e6f0ef');let q=36;r.forEach((t,i)=>{i?P.text(t,q+w[i]-6,y,9,'#102028',h,'r'):P.text(cl(t,28),q+6,y,9,'#102028',h);q+=w[i]});if(!h)P.line(36,y+6,559,'#e1e9e8');y+=18},
+ tb=(t,h,rows,w)=>{if(y>740)np();P.text(t,36,y,11,'#0b3b42',1);P.rect(36,y+5,40,2,'#ffb020');y+=22;row(h,w,1);rows.forEach(r=>row(r,w,0));y+=16};
+ P.add();P.rect(0,0,595,100,'#0b3b42');P.rect(0,100,595,4,'#ffb020');
+ P.text('SOLAR ELECTRICITY BILL',36,36,9,'#9fd8d3',1);P.text(mname(mon),36,70,24,'#ffffff',1);P.text(cl(D.plant,40),36,88,9,'#9fd8d3');
+ P.text(cl(c.name,30),559,38,10,'#9fd8d3',0,'r');P.text(Rs(bal),559,72,22,'#ffb020',1,'r');
+ y=134;
+ [['Total units',f(u)],['Rate / unit','Rs. '+f(rateOf(c),3)],['Is mahine ka bill',Rs(bill)],['Paid',Rs(paid)]].forEach((q,i)=>{const bx=36+i*133;P.rect(bx,y-12,123,46,'#f2f7f6');P.text(q[0],bx+10,y+4,8,'#62727d');P.text(q[1],bx+10,y+24,14,'#102028',1)});
+ y+=62;
+ tb('Bill details',['Description','Value'],[['Customer',cl(c.name,24)+(c.mno?' / '+c.mno:'')],['Units used'+(D.alloc?' (with loss share)':''),f(u)],['Rate per unit','Rs. '+f(rateOf(c),3)],['Energy charge',Rs(en)],...(fx?[['Fixed charge',Rs(fx)]]:[]),['Is mahine ka bill',Rs(bill)],['Previous balance',Rs(pb)],['Payment received',Rs(paid)],['Balance due',Rs(bal)]],[333,190]);
+ const rows=datesOf(cid).filter(d=>d.startsWith(mon)).map(d=>{const x=calc(cid,d);return[dmy(d),f(x.prev),f(x.cur),x.warn?'check':f(x.units)]});
+ if(rows.length)tb('Daily readings',['Date','Previous','Current','Units'],rows,[203,107,107,106]);
+ if(y>770)np();y+=10;
+ P.text('Generated '+new Date().toLocaleDateString('en-IN')+'  |  Bijli Manager Pro',36,y+14,8,'#62727d');P.line(400,y+10,559,'#9aa7ad');P.text('Authorised signature',559,y+24,8,'#62727d',0,'r');
+ deliver(P.build(),'Solar-Bill-'+cl(c.name,14).replace(/\W+/g,'_')+'-'+mon+'.pdf')}
+
+/* ---- SETTINGS / BACKUP ---- */
+function vSet(){return`<section class="card"><h3>Solar settings</h3>
+<label>Plant / business ka naam<input value="${e(D.plant)}" onchange="SOL.setP('plant',this.value)"></label>
+<div class="grid"><label>Capacity (kW)<input type="number" step="any" inputmode="decimal" value="${e(D.cap)}" onchange="SOL.setP('cap',this.value)"></label><label>Default rate / unit (${e(S.cur)})<input type="number" step="any" inputmode="decimal" value="${e(D.rate)}" onchange="SOL.setP('rate',this.value)"></label></div>
+<label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${D.alloc?'checked':''} onchange="SOL.setP('alloc',this.checked)"> Loss units customers me unke hisse ke hisaab se baanto</label>
+<p class="mu">ON karne par main meter aur customers ke total ka farak, har customer ke use ke hisse ke hisaab se uske bill me jud jata hai. Currency symbol Bijli Manager ki Settings se aata hai.</p></section>
+<section class="card"><h3>Solar backup</h3><p class="mu">Solar ka data Bijli Manager ke main Backup (Settings) me bhi shamil hota hai, to wahan se ek hi backup sab ka kaafi hai. Ye alag backup sirf solar ke liye hai. Data sirf is phone/browser me rehta hai.</p>
+<div class="row"><button onclick="SOL.backup()">Backup (JSON)</button><button class="g" onclick="SOL.csv()">Excel / CSV</button></div>
+<label style="margin-top:12px">Backup file se restore<input type="file" accept=".json,application/json" onchange="SOL.restoreFile(this)"></label></section>
+<section class="card"><h3>Solar data delete</h3><p class="mu">Sirf solar ka data delete hoga, Bijli Manager ka nahi. Bijli ka Erase solar ko nahi hatata.</p><div class="row"><button class="g" style="color:var(--bad)" onclick="SOL.wipe()">Saara solar data delete</button></div></section>`}
+function setP(k,v){D[k]=k=='rate'?(+v||0):v;sv()}
+async function saveText(name,txt,mime){
+ if(NAT()){try{await nativeShare(name,txt,true)}catch(x){alert('Share nahi ho paya: '+((x&&x.message)||x))}return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
+function backup(){saveText('solar-backup-'+today()+'.json',JSON.stringify(D),'application/json')}
+function csv(){
+ const r=[['Date','Meter','Type','Previous','Current','Units','Days']];
+ Object.keys(D.readings).sort().forEach(d=>D.meters.forEach(m=>{const c=calc(m.id,d);if(c)r.push([d,m.name,m.type,c.prev,c.cur,c.units,c.days])}));
+ saveText('solar-readings-'+today()+'.csv','﻿'+r.map(x=>x.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')}
+function checkBk(d){
+ if(!d||typeof d!='object'||Array.isArray(d))return'ye solar backup nahi hai';
+ if(!Array.isArray(d.meters)||!d.readings||typeof d.readings!='object')return'meters ya readings missing hain';
+ if(!d.meters.every(m=>m&&typeof m=='object'&&IDR.test(String(m.id))))return'meter id galat hai';
+ if(d.payments!==undefined&&!(Array.isArray(d.payments)&&d.payments.every(p=>p&&IDR.test(String(p.id))&&IDR.test(String(p.cid))&&typeof p.date=='string')))return'payments galat hain';
+ return''}
+function restoreFile(i){
+ const fl=i.files&&i.files[0];if(!fl)return;
+ const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result),err=checkBk(d);if(err){alert('Restore nahi hua: '+err);return}
+  if(!confirm('Abhi ka solar data replace ho jayega. Aage badhein?'))return;
+  try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}
+  D=Object.assign(defD(),d);D.flags=D.flags||{};D.payments=D.payments||[];sv();go()}catch(x){alert('Ye valid backup file nahi hai')}};
+ r.readAsText(fl);i.value=''}
+function wipe(){
+ if(!confirm('Saara solar data delete hoga. Pakka?')||!confirm('Aakhri baar puch raha hoon. Backup le liya?'))return;
+ try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}
+ D=defD();sv();V='set';go()}
+
+function exp(){return D}
+function imp(o){const er=checkBk(o);if(er){alert('Backup me solar data galat tha, solar restore nahi hua: '+er);return}try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}D=Object.assign(defD(),o);D.flags=D.flags||{};D.payments=D.payments||[];sv()}
+return{exp,imp,view,open,back,chD,setD,setM,setR,roll,mForm,mSave,mDel,payForm,paySave,payList,payDel,pdfBill,setP,backup,csv,restoreFile,wipe,closeD}
+})();
 </script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script></body></html>
