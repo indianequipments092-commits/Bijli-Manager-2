@@ -2679,4 +2679,103 @@ function setAuto(v){ss.auto=!!v;persist()}
 setTimeout(startup,2500);setInterval(tick,15000);
 return{card,auth,copyKey,logout,push,pull,overwrite,setAuto,tick,startup}
 })();
-</script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script></body></html>
+</script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script><style>.cbw{overflow:hidden;border-radius:10px;background:#8883;padding:18px;touch-action:none;margin-top:8px}
+.cbi{position:relative;width:fit-content;max-width:100%;margin:0 auto;line-height:0}
+.cbi canvas{display:block;max-width:100%;max-height:55vh;width:auto;height:auto}
+.cbs{position:absolute;box-shadow:0 0 0 9999px rgba(0,0,0,.55);outline:2px solid #fff;cursor:move;touch-action:none}
+.cbs i{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;touch-action:none}
+.cbs i:after{content:"";position:absolute;inset:7px;background:#fff;border:2px solid #0e7c86;border-radius:3px}
+.cbs i[data-h=nw]{left:0;top:0}.cbs i[data-h=n]{left:50%;top:0}.cbs i[data-h=ne]{left:100%;top:0}.cbs i[data-h=e]{left:100%;top:50%}.cbs i[data-h=se]{left:100%;top:100%}.cbs i[data-h=s]{left:50%;top:100%}.cbs i[data-h=sw]{left:0;top:100%}.cbs i[data-h=w]{left:0;top:50%}
+.tgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:10px}
+.tgc{position:relative;border:2px solid transparent;border-radius:10px;padding:4px;background:#8881;text-align:center;font-size:12px;cursor:pointer;user-select:none}
+.tgp{height:130px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.tgq{position:relative;flex-shrink:0;background:#fff;box-shadow:0 1px 4px #0004;transition:transform .2s}
+.tgq canvas{display:block;width:100%;height:100%}
+.tgo{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.tgc.on{border-color:#0e7c86;background:#0e7c8622}
+.tg-pd .tgc.on{border-color:#d32f2f;background:#d32f2f22}
+.tg-pd .tgc.on:after{content:"✕";position:absolute;top:28%;left:0;right:0;font-size:40px;color:#d32f2f;line-height:1;pointer-events:none}
+.tgz{position:absolute;top:2px;right:2px;z-index:2;font-size:13px;background:#000a;border-radius:6px;padding:2px 4px;font-weight:400}
+.tgbig{position:fixed;inset:0;z-index:99999;background:#000d;overflow:auto;padding:12px;text-align:center;color:#fff;font-size:13px}
+.tgbig canvas{width:100%;max-width:900px;background:#fff;margin-top:8px}
+</style><script>
+/* ===== Crop box (drag handles) + PDF page previews ===== */
+let CBX=null,CBV=null;
+function cbMake(host,src,onch){
+ host.innerHTML='<div class="cbw"><div class="cbi"><canvas></canvas><div class="cbs">'+['nw','n','ne','e','se','s','sw','w'].map(h=>'<i data-h="'+h+'"></i>').join('')+'</div></div></div>';
+ const cvs=host.querySelector('canvas'),bx=host.querySelector('.cbs');let s={l:0,t:0,r:1,b:1},ar=0,sw=1,sh=1,dr=null;
+ const show=()=>{bx.style.left=s.l*100+'%';bx.style.top=s.t*100+'%';bx.style.width=(s.r-s.l)*100+'%';bx.style.height=(s.b-s.t)*100+'%';onch&&onch(s,sw,sh)};
+ const draw=c=>{sw=c.width;sh=c.height;const k=Math.min(1,1000/Math.max(sw,sh));cvs.width=Math.round(sw*k);cvs.height=Math.round(sh*k);cvs.getContext('2d').drawImage(c,0,0,cvs.width,cvs.height)};
+ const step=(m,dx,dy,o)=>{let{l,t,r,b}=o;const M=.05;
+  if(m=='move'){const w=r-l,h=b-t;l=Math.min(1-w,Math.max(0,l+dx));t=Math.min(1-h,Math.max(0,t+dy));return{l,t,r:l+w,b:t+h}}
+  if(m.includes('w'))l=Math.min(r-M,Math.max(0,l+dx));if(m.includes('e'))r=Math.max(l+M,Math.min(1,r+dx));
+  if(m.includes('n'))t=Math.min(b-M,Math.max(0,t+dy));if(m.includes('s'))b=Math.max(t+M,Math.min(1,b+dy));
+  if(ar){const k=sw/sh,hz=m.length==2||m=='e'||m=='w';
+   if(hz){const h=(r-l)*k/ar;if(m.includes('n'))t=b-h;else if(m.includes('s'))b=t+h;else{const c=(o.t+o.b)/2;t=c-h/2;b=c+h/2}}
+   else{const w=(b-t)*ar/k,c=(o.l+o.r)/2;l=c-w/2;r=c+w/2}}
+  if(l<-1e-6||t<-1e-6||r>1+1e-6||b>1+1e-6||r-l<M||b-t<M)return null;return{l,t,r,b}};
+ const fit=a=>{ar=a||0;if(!a)return;const k=sw/sh;let w=1,h=k/a;if(h>1){h=1;w=a/k}w*=.9;h*=.9;const cx=Math.min(1-w/2,Math.max(w/2,(s.l+s.r)/2)),cy=Math.min(1-h/2,Math.max(h/2,(s.t+s.b)/2));s={l:cx-w/2,r:cx+w/2,t:cy-h/2,b:cy+h/2};show()};
+ bx.onpointerdown=ev=>{ev.preventDefault();const r=cvs.getBoundingClientRect();dr={m:ev.target.dataset.h||'move',x:ev.clientX,y:ev.clientY,o:{...s},W:r.width,H:r.height};bx.setPointerCapture(ev.pointerId)};
+ bx.onpointermove=ev=>{if(!dr)return;const n=step(dr.m,(ev.clientX-dr.x)/dr.W,(ev.clientY-dr.y)/dr.H,dr.o);if(n){s=n;show()}};
+ bx.onpointerup=bx.onpointercancel=()=>{dr=null};
+ draw(src);show();
+ return{get:()=>({...s}),getAr:()=>ar,fit,draw:c=>{draw(c);show()},reset:()=>{s={l:0,t:0,r:1,b:1};ar=0;show()}}}
+const cbBar=n=>'<div class="row">'+[['Free',0],['1:1',1],['4:5',.8],['3:4',.75],['16:9',16/9],['9:16',9/16]].map(a=>`<button class="g" onclick="${n}&&${n}.fit(${a[1]})">${a[0]}</button>`).join('')+`<button class="g" onclick="${n}&&${n}.reset()">Reset</button></div>`;
+/* image crop */
+V.io=['Crop / Rotate',()=>`${fin('image/*',0,'coLoad()')}<div id="ci" style="display:none"><div class="row"><button class="g" onclick="coT('r',-90)">⟲ Left</button><button class="g" onclick="coT('r',90)">⟳ Right</button><button class="g" onclick="coT('h')">⇆ Flip H</button><button class="g" onclick="coT('v')">⇅ Flip V</button></div><p class="mu">Pehle rotate/flip karo, phir box ko kone ya kinare se kheench kar crop area chuno. Box ke andar kheencho to wo hilega.</p><div id="cbh"></div><p class="mu" id="cbi"></p>${cbBar('CBX')}<div class="row"><button onclick="coSave()">Save</button></div></div>`];
+window.coLoad=async function(){const f=$('#f').files[0];if(!f)return;try{IC={i:await loadImg(f),r:0,h:0,v:0,n:f.name,t:OK.includes(f.type)?f.type:'image/png'}}catch(x){return alert(x.message)}CBX=null;$('#ci').style.display='block';coDraw()};
+window.coDraw=function(){if(!IC)return;const a=CBX?CBX.getAr():0;CBX=cbMake($('#cbh'),coBase(),(s,w,h)=>{IC.cx={...s};const i=$('#cbi');if(i)i.textContent='Crop: '+Math.round((s.r-s.l)*w)+' × '+Math.round((s.b-s.t)*h)+' px'});if(a)CBX.fit(a)};
+window.coCrop=function(){const b=coBase(),s=IC.cx||{l:0,t:0,r:1,b:1},sw=Math.max(1,b.width*(s.r-s.l)),sh=Math.max(1,b.height*(s.b-s.t)),c=cv(Math.max(1,Math.round(sw)),Math.max(1,Math.round(sh)));c.getContext('2d').drawImage(b,b.width*s.l,b.height*s.t,sw,sh,0,0,c.width,c.height);return c};
+/* video crop */
+const vrSeek=(v,t)=>new Promise(r=>{if(v.readyState<2){v.addEventListener('loadeddata',()=>vrSeek(v,t).then(r),{once:true});setTimeout(r,3000);return}if(Math.abs(v.currentTime-t)<.01)return r();const f=()=>{clearTimeout(w);r()},w=setTimeout(r,2500);v.addEventListener('seeked',f,{once:true});v.currentTime=t});
+const vrGrab=v=>{const c=cv(v.videoWidth||320,v.videoHeight||180);c.getContext('2d').drawImage(v,0,0,c.width,c.height);return c};
+V.vr=['Video Crop / Rotate',()=>`${vdHead('vdInfo().then(vrInit)')}<div id="vrs" style="display:none"><p class="mu">Box ko kone ya kinare se kheench kar jo hissa rakhna hai wo chuno. Frame slider se video ka koi bhi frame dekh sakte ho.</p><div id="vrh"></div><label>Frame<input type="range" id="vr_s" min="0" max="1000" value="0" oninput="vrFrame()"></label><p class="mu" id="vrz"></p>${cbBar('CBV')}<label>Ghumao<select id="vr_r2"><option value="0">No</option><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">90° ulta</option></select></label><div class="row"><button onclick="vrRun()">Apply</button></div></div>${vdNote}`];
+async function vrInit(){const b=$('#vrs');if(!b)return;CBV=null;if(!VV){b.style.display='none';return}b.style.display='block';const v=VV.v;await vrSeek(v,Math.min(1,(v.duration||0)/2));CBV=cbMake($('#vrh'),vrGrab(v),(s,w,h)=>{const z=$('#vrz');if(z)z.textContent='Crop: '+Math.round((s.r-s.l)*w)+' × '+Math.round((s.b-s.t)*h)+' px'})}
+let vrBusy=0;async function vrFrame(){if(vrBusy||!VV||!CBV)return;vrBusy=1;try{const v=VV.v;await vrSeek(v,(+$('#vr_s').value/1000)*(v.duration||0));CBV.draw(vrGrab(v))}finally{vrBusy=0}}
+window.vrCrop=function(){if(!CBV)throw new Error('Choose a video first (wait for it to load)');const s=CBV.get();return[s.l,s.t,s.r-s.l,s.b-s.t]};
+/* PDF thumbnails */
+const TG={d:null,n:0,sel:new Set(),tk:0,pk:0},TGT=['ps','pr','pd','pn','wm'];let WMF=null,WMUrl='';
+const tgRange=a=>{a=[...a].sort((x,y)=>x-y);const o=[];for(let i=0;i<a.length;){let j=i;while(a[j+1]==a[j]+1)j++;o.push(j>i?a[i]+'-'+a[j]:''+a[i]);i=j+1}return o.join(',')};
+async function tgFill(d,i,q,W,H){const p=await d.getPage(i),v=p.getViewport({scale:1}),k=Math.min(W/v.width,H/v.height),dw=Math.round(v.width*k),dh=Math.round(v.height*k);q.style.width=dw+'px';q.style.height=dh+'px';q.dataset.w=dw;q.dataset.h=dh;q.dataset.pw=v.width;q.dataset.ph=v.height;const c=await pRender(p,k*1.5),t=q.querySelector('canvas');t.width=c.width;t.height=c.height;t.getContext('2d').drawImage(c,0,0);c.width=c.height=0}
+async function tgBig(d,i){const o=document.createElement('div');o.className='tgbig';o.innerHTML='Page '+i+' · band karne ke liye tap karo<br>';o.onclick=()=>o.remove();document.body.appendChild(o);try{const p=await d.getPage(i),c=await pRender(p,Math.min(2.5,Math.min(innerWidth,900)*Math.min(devicePixelRatio||1,2)/p.getViewport({scale:1}).width));o.appendChild(c)}catch(x){o.append('Preview nahi khula')}}
+const tgCell=(j,z)=>`<div class="tgc" data-i="${j}">${z?'<b class="tgz">🔍</b>':''}<div class="tgp"><div class="tgq" style="width:70px;height:92px"><canvas></canvas><div class="tgo"></div></div></div>${j}</div>`;
+function tgRot(q,a){const dw=+q.dataset.w||70,dh=+q.dataset.h||92,s=a%180?Math.min(1,92/dh,130/dw):1;q.style.transform=`rotate(${a}deg) scale(${s})`}
+function tgMark(){const h=$('#thg');if(h)h.querySelectorAll('.tgc').forEach(c=>c.classList.toggle('on',TG.sel.has(+c.dataset.i)))}
+const WMU=()=>{const f=$('#wm_i')&&$('#wm_i').files[0];if(!f)return'';if(WMF!==f){WMF=f;WMUrl=URL.createObjectURL(f)}return WMUrl};
+let WMS={k:'',s:null};
+async function wmSrc(){try{const lf=$('#wm_i')&&$('#wm_i').files[0],k=lf?'f'+lf.name+lf.size+lf.lastModified:'t'+$('#wm_t').value+$('#wm_c').value;if(WMS.k==k)return WMS.s;let s=null;if(lf){const i=await loadImg(lf),z=Math.min(1,1200/Math.max(i.naturalWidth,i.naturalHeight));s=cv(Math.max(1,Math.round(i.naturalWidth*z)),Math.max(1,Math.round(i.naturalHeight*z)));s.getContext('2d').drawImage(i,0,0,s.width,s.height)}else{const t=$('#wm_t').value;if(t.trim())s=wmImg(t,120,$('#wm_c').value)}WMS={k,s};return s}catch(x){return null}}
+function wmPaint(q,o,S){o.innerHTML='';if(!S||!$('#wm_o'))return;const W=+q.dataset.pw,H=+q.dataset.ph,dw=+q.dataset.w,f=dw/W,dp=2,c=document.createElement('canvas');c.width=Math.round(dw*dp);c.height=Math.round(H*f*dp);c.style.cssText='width:100%;height:100%';const x=c.getContext('2d');x.scale(f*dp,f*dp);
+ const op=Math.min(1,Math.max(.05,(+$('#wm_o').value||25)/100)),ang=+$('#wm_a').value||0,pc=Math.min(150,Math.max(5,+$('#wm_z').value||50)),tile=$('#wm_p').value=='t',th=ang*Math.PI/180,w=W*pc/100,h=w*S.height/S.width;
+ const put=(cx,cy)=>{x.save();x.translate(cx,H-cy);x.rotate(-th);x.globalAlpha=op;x.drawImage(S,-w/2,-h/2,w,h);x.restore()};
+ if(!tile)put(W/2,H/2);else{const sx=w*1.4,sy=Math.max(h*3,w*.5);let r=0,cnt=0;for(let cy=sy/2;cy<H+sy/2&&cnt<1500;cy+=sy,r++)for(let cx=(r%2?sx/2:0);cx<W+sx/2&&cnt<1500;cx+=sx,cnt++)put(cx,cy)}o.appendChild(c)}
+const TQ=[];let TB=0;
+async function tgPump(){if(TB)return;TB=1;while(TQ.length){try{await TQ.shift()()}catch(x){}}TB=0}
+function tgLazy(root,d,alive,after){const io=new IntersectionObserver(es=>es.forEach(en=>{if(!en.isIntersecting)return;io.unobserve(en.target);const q=en.target;TQ.push(async()=>{if(!alive()||q.dataset.f)return;q.dataset.f=1;await tgFill(d,+q.closest('.tgc').dataset.i,q,92,128);after&&after(q)});tgPump()}),{rootMargin:'400px'});root.querySelectorAll('.tgq').forEach(q=>io.observe(q));return io}
+function tgOv(one){const h=$('#thg');if(!h||!TG.d)return;const g=id=>($('#'+id)||{}).value,n=TG.n,sel=i=>!TG.sel.size||TG.sel.has(i);
+ (one?[one]:[...h.querySelectorAll('.tgq')]).forEach(q=>{const i=+q.closest('.tgc').dataset.i,o=q.querySelector('.tgo'),dw=+q.dataset.w||70,sc=dw/(+q.dataset.pw||595);let H='';
+  if(tl=='pr')tgRot(q,sel(i)?+g('a')||0:0);
+  if(tl=='pn'){const st=+g('st')||1,sz=+g('sz')||11,fm=g('fm'),ps=g('pos'),k=st+i-1,tot=st+n-1,t=fm=='1'?k:fm=='Page 1'?'Page '+k:fm=='Page 1 of N'?'Page '+k+' of '+tot:k+' / '+tot,fs=Math.max(3,sz*sc);
+   H=`<span style="position:absolute;bottom:${20*sc-.1535*fs}px;${ps=='c'?'left:50%;transform:translateX(-50%)':ps=='r'?'right:'+30*sc+'px':'left:'+30*sc+'px'};font:${fs}px Helvetica,Arial,sans-serif;color:#333;white-space:nowrap;line-height:1">${e(t)}</span>`}
+  if(tl=='wm'){o.innerHTML='';if(sel(i))wmSrc().then(S=>wmPaint(q,o,S));return}
+  o.innerHTML=H})}
+async function tgBuild(fl){const tk=++TG.tk,h=$('#thg');TG.d=null;TG.sel=new Set();if(TG.io)TG.io.disconnect();h.className='tg-'+tl;h.innerHTML='<p class="mu"><i class="spin"></i> Preview ban raha hai…</p>';
+ const d=await pOpen((await pdfBytes(fl)).slice());if(tk!=TG.tk)return;TG.d=d;TG.n=d.numPages;
+ const T={ps:'Pages par tap karke chuno, range apne aap bhar jayegi.',pd:'Jo pages hatane hain unpar tap karo.',pr:'Tap karke pages chuno (kuch na chuno to sab). Ghumao live dikhta hai.',pn:'Number asli jagah aur size par dikhta hai.',wm:'Tap karke pages chuno (khali = sab). Watermark asli jagah, size aur tilt par dikhta hai.'}[tl]||'';
+ h.innerHTML=`<p class="mu">${T} 🔍 se page bada dikhta hai. Thumbnail scroll karne par bante hain.</p><div class="tgg">${Array.from({length:d.numPages},(_,j)=>tgCell(j+1,1)).join('')}</div>`;
+ h.onclick=ev=>{const c=ev.target.closest('.tgc');if(!c)return;const i=+c.dataset.i;if(ev.target.closest('.tgz')){tgBig(TG.d,i);return}if(tl=='pn')return;TG.sel.has(i)?TG.sel.delete(i):TG.sel.add(i);const f=$('#r')||$('#wm_r');if(f)f.value=tgRange(TG.sel);tgMark();tgOv()};
+ TG.io=tgLazy(h,d,()=>tk==TG.tk,tgOv)}
+{const p0=window.pinfo;window.pinfo=async function(){await p0.apply(this,arguments);const el=$('#inf');if(!el||!TGT.includes(tl))return;if(!$('#thg'))el.insertAdjacentHTML('afterend','<div id="thg"></div>');const f=$('#f').files[0];if(!f){TG.tk++;TG.d=null;$('#thg').innerHTML='';return}try{await tgBuild(f)}catch(x){$('#thg').innerHTML='<p class="mu">Preview nahi ban saka: '+e(x.message||x)+'</p>'}}}
+['input','change'].forEach(t=>document.addEventListener(t,ev=>{if(!TG.d||!$('#thg')||!TGT.includes(tl))return;const id=ev.target.id;if(id=='r'||id=='wm_r'){const s=(ev.target.value||'').trim();try{TG.sel=s&&!/^all$/i.test(s)?new Set(rng(s,TG.n).map(i=>i+1)):new Set()}catch(x){}}tgMark();tgOv()}));
+/* merge: first page thumbnail + page count */
+const PMT=new WeakMap(),PMP=new WeakSet();
+const PMD=new WeakMap(),PMO=new WeakSet();
+window.pmEye=i=>{const f=PM[i];if(!f)return;PMO.has(f)?PMO.delete(f):PMO.add(f);pmList()};
+window.pmList=function(){const l=$('#pml');if(!l)return;l.innerHTML=PM.length?PM.map((f,i)=>{const t=PMT.get(f),d=PMD.get(f),op=PMO.has(f)&&d;return`<div><div class="li" style="cursor:default;gap:8px">${t&&t.u?`<img src="${t.u}" style="width:46px;height:62px;object-fit:contain;background:#fff;border-radius:4px;box-shadow:0 1px 3px #0004;flex:none">`:''}<span style="flex:1;min-width:0">${i+1}. ${e(f.name)}<br><span class="mu">${fz(f.size)}${t&&t.n?' · '+t.n+' pages':''}</span></span><span style="white-space:nowrap">${d?`<button class="g" onclick="pmEye(${i})">👁</button> `:''}<button class="g" onclick="pmMv(${i},-1)">↑</button> <button class="g" onclick="pmMv(${i},1)">↓</button> <button class="g" onclick="PM.splice(${i},1);pmList()">✕</button></span></div>${op?`<div class="tgg pmg" data-k="${i}">${Array.from({length:d.numPages},(_,j)=>tgCell(j+1,0)).join('')}</div>`:''}</div>`}).join(''):'<p class="mu">No PDF yet.</p>';
+ PM.forEach((f,i)=>{const d=PMD.get(f);if(d&&PMO.has(f)){const r=l.querySelector(`.pmg[data-k="${i}"]`);if(r){r.onclick=ev=>{const c=ev.target.closest('.tgc');if(c)tgBig(d,+c.dataset.i)};tgLazy(r,d,()=>document.body.contains(r),null)}}});
+ PM.forEach(async f=>{if(PMT.has(f)||PMP.has(f))return;PMP.add(f);try{const d=await pOpen((await pdfBytes(f)).slice()),q=document.createElement('div');q.innerHTML='<canvas></canvas>';await tgFill(d,1,q,92,124);PMD.set(f,d);PMT.set(f,{u:q.querySelector('canvas').toDataURL('image/jpeg',.7),n:d.numPages})}catch(x){PMT.set(f,{u:'',n:0})}pmList()})};
+/* preview of every PDF result (merge, split, rotate, delete, numbers, watermark...) */
+async function prvOut(a){const x=(a||[]).find(y=>y&&y.blob&&(y.blob.type=='application/pdf'||/\.pdf$/i.test(y.name||'')));if(!x||x.blob.size>40e6)return;const h=$('#tr .card h3');if(!h)return;const id='po'+(++TG.pk);h.insertAdjacentHTML('afterend',`<div id="${id}"><p class="mu"><i class="spin"></i> Preview…</p></div>`);
+ try{const d=await pOpen(new Uint8Array(await x.blob.arrayBuffer()));const o=$('#'+id);if(!o)return;o.innerHTML=`<p class="mu">Preview: ${e(x.name)} · ${d.numPages} pages. Bada dekhne ke liye tap karo.</p><div class="tgg">${Array.from({length:d.numPages},(_,j)=>tgCell(j+1,0)).join('')}</div>`;o.onclick=ev=>{const c=ev.target.closest('.tgc');if(c)tgBig(d,+c.dataset.i)};tgLazy(o,d,()=>document.body.contains(o),null)}catch(z){const o=$('#'+id);if(o)o.innerHTML=''}}
+{const s0=window.showOut;window.showOut=function(a){const r=s0.apply(this,arguments);prvOut(a);return r}}
+
+</script></body></html>
