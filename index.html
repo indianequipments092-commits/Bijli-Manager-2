@@ -189,7 +189,7 @@ function migrate(d){d.cur=d.cur||'₹';d.fav=Array.isArray(d.fav)?d.fav.filter(x
 if(!d.accounts.length)['Main Account','Renters','Owner','Borewell & Common'].forEach(n=>d.accounts.push({id:uid(),name:n}));
 d.meters.forEach(m=>{if(!m.acc||!d.accounts.some(a=>a.id==m.acc))m.acc=d.accounts[{main:0,renter:1,owner:2,borewell:3,common:3}[m.type]||0].id});
 d.cycles.forEach(c=>{c.rd=c.rd||{}});return d}
-const bkJson=()=>{const o=Object.assign({},S);delete o.pin;try{if(window.SOL)o.solar=SOL.exp()}catch(x){}return JSON.stringify(o)};
+const bkJson=()=>{const o=Object.assign({},S);delete o.pin;try{if(window.SOL)o.solar=SOL.exp()}catch(x){}try{const px=window.PVT&&PVT.idx();if(px)o.pvt=px}catch(x){}return JSON.stringify(o)};
 function copyBk(){$('#bk').value=bkJson();$('#bk').select();try{navigator.clipboard&&navigator.clipboard.writeText($('#bk').value).catch(()=>{})}catch(x){}S.lastBk=Date.now();save();bkNote()}
 function dlBackup(){if(NAT()){nativeShare('bijli-backup-'+new Date().toISOString().slice(0,10)+'.json',bkJson(),true).then(()=>{S.lastBk=Date.now();save();bkNote()}).catch(()=>alert('Backup could not be shared. Try Copy backup text.'));return}const b=new Blob([bkJson()],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='bijli-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);S.lastBk=Date.now();save();bkNote()}
 function bkNote(){const n=$('#bkn');if(!n)return;const old=!S.lastBk||Date.now()-S.lastBk>7*864e5;n.innerHTML=S.meters&&S.meters.length&&old?'<div class="card" style="margin:8px 12px"><b>⚠ No backup in the last 7 days.</b> Data lives only in this browser.<div class="row"><button onclick="dlBackup()">Download backup</button></div></div>':''}
@@ -297,13 +297,13 @@ function restore(){let d;try{d=JSON.parse($('#bk').value)}catch(x){return alert(
 const er=checkBk(d);if(er)return alert('Backup rejected: '+er+'.');
 if(!confirm('Replace all current data with this backup ('+d.meters.length+' meters, '+d.cycles.length+' cycles)? Current data is kept as a safety copy first.'))return;
 try{localStorage.setItem(K+'_prev',JSON.stringify(S))}catch(x){}
-const sol=d.solar;delete d.solar;const pin=S.pin;S=migrate(d);if(pin)S.pin=pin;else delete S.pin;save();if(sol&&window.SOL)SOL.imp(sol);theme();go()}
+const sol=d.solar;delete d.solar;delete d.pvt;const pin=S.pin;S=migrate(d);if(pin)S.pin=pin;else delete S.pin;save();if(sol&&window.SOL)SOL.imp(sol);theme();go()}
 function restoreFile(i){const f=i.files&&i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#bk').value=r.result;restore()};r.readAsText(f);i.value=''}
 function wipe(){if(confirm('Erase all meters, cycles and payments?')&&confirm('This cannot be undone. Continue?')){try{localStorage.setItem(K+'_prev',JSON.stringify(S))}catch(x){}S=migrate({meters:[],cycles:[],cur:'₹',theme:'auto'});save();go()}}
 const rateSet=()=>`<section class="card"><h3>Rate aur borewell rule</h3><p class="mu">Naye cycles pe lagega. Actual rate = actual bill ÷ main units. Apna rate khali ho to actual hi lagega. Borewell ka fixed share sirf renters se.</p><label>Borewell share, har renter (₹)<input type="number" step="any" value="${e(S.bwShare==null?500:S.bwShare)}" oninput="S.bwShare=this.value;save()"></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.ownActual!==false?'checked':''} onchange="S.ownActual=this.checked;save()"> Owner pe actual rate lagao</label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox" style="width:auto;margin:0" ${S.showActual?'checked':''} onchange="S.showActual=this.checked;save()"> Show actual (sab asli rate pe, borewell asli kharche se)</label></section>`;
 const sets=()=>setsBase()+rateSet()+marginSet()+pinCard()+(window.CLD?CLD.card():'');
 function toggleOff(id){const m=S.meters.find(x=>x.id==id);if(!m)return;m.off=!m.off;save();go()}
-function go(){$('#v').innerHTML=tab=='home'?home():tab=='meters'?(mid?rec():meters()):tab=='cycles'?(cid?cyc():cycles()):tab=='tools'?tools():tab=='more'?(window.SOL?SOL.view():''):sets();
+function go(){if(tab!='more'&&window.PVT)PVT.leave();$('#v').innerHTML=tab=='home'?home():tab=='meters'?(mid?rec():meters()):tab=='cycles'?(cid?cyc():cycles()):tab=='tools'?tools():tab=='more'?(window.PVT&&PVT.on()?PVT.view():(window.SOL?SOL.view():'')):sets();
 bkNote();$('#nav').innerHTML=T.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';cid=mid=null;tl=null;go();scrollTo(0,0)"><i>${t[1]}</i>${t[2]}</button>`).join('');out()}
 
 function hero(){const L=cs(),rn=S.meters.filter(m=>m.type=='renter'),tot=rn.reduce((a,m)=>a+Math.max(0,dues(m).d),0),bill=L.reduce((a,c)=>a+calc(c).bl.filter(x=>x.m.type=='renter').reduce((q,x)=>q+x.amt,0),0),p=bill?Math.max(0,Math.min(1,1-tot/bill)):0,t=f(Math.round(tot),0);
@@ -2402,8 +2402,8 @@ function view(){
  return`<div class="bar"><button class="g" onclick="SOL.back()">‹ Back</button><h2>☀️ Solar Units</h2><span></span></div>
 <div class="sl-sub">${SUB.map(t=>`<button class="${t[0]==V?'':'g'}" onclick="SOL.open('${t[0]}')"><i>${t[1]}</i>${t[2]}</button>`).join('')}</div>`+body}
 function hub(){return`<div class="bar"><h2>More</h2></div>
-<section class="card"><h3>Extra tools</h3><div class="grid"><button class="g" style="padding:14px 8px;text-align:center" onclick="SOL.open('entry')"><span style="font-size:22px;display:block">☀️</span>Solar Units</button></div></section>
-<p class="mu" style="text-align:center">Solar ka daily unit count, customer accounts aur bills. Ye data Bijli Manager ke main Backup me bhi aata hai.</p>`}
+<section class="card"><h3>Extra tools</h3><div class="grid"><button class="g" style="padding:14px 8px;text-align:center" onclick="SOL.open('entry')"><span style="font-size:22px;display:block">☀️</span>Solar Units</button>${window.PVT?`<button class="g" style="padding:14px 8px;text-align:center" onclick="PVT.open()"><span style="font-size:22px;display:block">🔒</span>Pvt Documents</button>`:''}</div></section>
+<p class="mu" style="text-align:center">Solar ka daily unit count, customer accounts aur bills. Ye data Bijli Manager ke main Backup me bhi aata hai. Pvt Documents ka data alag encrypted rehta hai, main Backup me sirf chhota index (naam aur count) jata hai.</p>`}
 function open(v){V=v;go();scrollTo(0,0)}
 function back(){V=null;go();scrollTo(0,0)}
 const empty=t=>`<section class="card" style="text-align:center"><p class="mu">${t}</p><div class="row" style="justify-content:center"><button onclick="SOL.open('cust')">Setup karo</button></div></section>`;
@@ -2575,6 +2575,257 @@ function exp(){return D}
 function imp(o){const er=checkBk(o);if(er){alert('Backup me solar data galat tha, solar restore nahi hua: '+er);return}try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}D=Object.assign(defD(),o);D.flags=D.flags||{};D.payments=D.payments||[];sv()}
 return{exp,imp,view,open,back,chD,setD,setM,setR,roll,mForm,mSave,mDel,payForm,paySave,payList,payDel,pdfBill,setP,backup,csv,restoreFile,wipe,closeD}
 })();
+</script><script>/* ===== More > Pvt Documents (PIN lock, AES-GCM encrypted, IndexedDB, own storage; does not touch Bijli data) ===== */
+window.PVT=(()=>{
+const LK='bijli_pvt_v1',LKL='bijli_pvt_lk',IXK='bijli_pvt_idx',IT=3e5,IDLE=12e4,IDR=/^[A-Za-z0-9_-]{1,40}$/,TYS=['image/jpeg','image/png','application/pdf'];
+const CATS=['Aadhaar','PAN','Voter ID','Driving Licence','Passport','Bank','Property','Other'];
+let ON=0,KEY=null,M=null,idle=0,hidAt=0,urls=[],PD=null,RS=null,LAST=null,exs=[];
+const st={pid:'',q:'',sel:new Set()};
+const E=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const Q=s=>document.querySelector(s),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const enc=new TextEncoder(),dec=new TextDecoder();
+const b2s=u=>{let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
+const s2b=s=>{const t=atob(s),u=new Uint8Array(t.length);for(let i=0;i<t.length;i++)u[i]=t.charCodeAt(i);return u};
+const today=()=>new Date().toLocaleDateString('en-CA');
+const dmy=d=>{const q=String(d||'').split('-');return q.length==3?q[2]+'/'+q[1]+'/'+q[0]:(d||'')};
+const dd=(a,b)=>{const g=s=>{const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((g(a)-g(b))/864e5)};
+const MB=n=>(n/1048576).toFixed(n>1e7?0:1)+' MB';
+const lib=(u,t)=>new Promise((ok,no)=>{if(window[t])return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Library load nahi hui. Internet chalu karo (sirf pehli baar chahiye).'));document.head.appendChild(s)});
+const JZL=()=>lib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js','JSZip'),PLL=()=>lib('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js','PDFLib');
+
+/* ---- crypto ---- */
+async function derive(pin,salt){const k=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:IT,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function seal(k,u){const iv=crypto.getRandomValues(new Uint8Array(12));return{iv,ct:new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,u))}}
+const unseal=async(k,iv,ct)=>new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},k,ct));
+
+/* ---- IndexedDB ---- */
+let _db;const db=()=>_db||(_db=new Promise((ok,no)=>{if(!window.indexedDB)return no(new Error('Is browser me secure storage nahi hai'));const r=indexedDB.open('bm_pvt',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('kv');d.createObjectStore('blob')};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}));
+const tx=async(s,m,fn)=>{const d=await db();return new Promise((ok,no)=>{const t=d.transaction(s,m),r=fn(t.objectStore(s));t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error);t.onabort=()=>no(t.error||new Error('storage error'))})};
+const iget=(s,k)=>tx(s,'readonly',o=>o.get(k)),iput=(s,k,v)=>tx(s,'readwrite',o=>o.put(v,k)),idel=(s,k)=>tx(s,'readwrite',o=>o.delete(k)),iclr=s=>tx(s,'readwrite',o=>o.clear());
+const putF=async(id,u)=>iput('blob',id,await seal(KEY,u));
+const getF=async id=>{const r=await iget('blob',id);if(!r)throw new Error('File nahi mili');return unseal(KEY,r.iv,r.ct)};
+function idxSave(){try{const c={};M.docs.forEach(d=>c[d.pid]=(c[d.pid]||0)+1);localStorage.setItem(IXK,JSON.stringify({persons:M.persons.map(p=>({name:p.n,docs:c[p.id]||0})),docs:M.docs.length}))}catch(x){}}
+const saveM=async()=>{await iput('kv','meta',await seal(KEY,enc.encode(JSON.stringify(M))));idxSave()};
+const norm=()=>{M=M||{};M.persons=Array.isArray(M.persons)?M.persons:[];M.cats=Array.isArray(M.cats)?M.cats:[];M.docs=Array.isArray(M.docs)?M.docs:[]};
+const meta=()=>{try{return JSON.parse(localStorage.getItem(LK))}catch(x){return null}};
+(async()=>{try{if(!meta()){const r=await iget('kv','lock');if(r)localStorage.setItem(LK,JSON.stringify(r))}}catch(x){}})();
+async function saveLock(salt,k){const c=await seal(k,enc.encode('pvt-ok')),r={s:b2s(salt),i:b2s(c.iv),c:b2s(c.ct)};localStorage.setItem(LK,JSON.stringify(r));try{await iput('kv','lock',r)}catch(x){}}
+
+/* ---- lock state ---- */
+function touch(){clearTimeout(idle);if(KEY)idle=setTimeout(lock,IDLE)}
+function free(){urls.forEach(u=>URL.revokeObjectURL(u));urls=[]}
+function lock(){KEY=null;M=null;PD=null;exs=[];st.sel.clear();st.q='';st.pid='';clearTimeout(idle);free();const d=Q('#pvd');if(d&&d.open)d.close();if(ON)go()}
+['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,()=>{if(KEY)touch()},{passive:true,capture:true}));
+document.addEventListener('visibilitychange',()=>{if(!KEY)return;if(document.hidden)hidAt=Date.now();else if(hidAt&&Date.now()-hidAt>6e4)lock();else touch()});
+const open=()=>{ON=1;go();scrollTo(0,0)};
+const back=()=>{lock();ON=0;go();scrollTo(0,0)};
+const leave=()=>{if(!ON)return;ON=0;lock()};
+const on=()=>ON;
+const idx=()=>{try{return JSON.parse(localStorage.getItem(IXK))}catch(x){return null}};
+
+/* ---- screens ---- */
+const hdr=r=>`<div class="bar"><button class="g" onclick="PVT.back()">‹ Back</button><h2>🔒 Pvt Documents</h2>${r||'<span></span>'}</div>`;
+function view(){
+ if(!meta())return hdr()+`<section class="card"><h3>Naya lock banao</h3><label>PIN (4 se 10 digit)<input id="pv_a" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><label>PIN dobara<input id="pv_b" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><div class="row"><button onclick="PVT.setup()">Lock banao</button></div><p id="pv_e" class="w"></p><p class="mu">Saare documents is PIN se encrypt hote hain aur sirf is phone me rehte hain. <b>PIN bhool gaye to data wapas nahi aayega.</b> Lamba PIN zyada safe hai. Backup zaroor lete raho.</p></section>
+<section class="card"><h3>Purani backup hai?</h3><p class="mu">Naye phone par backup file se seedha restore kar sakte ho. Wahi PIN chalega jo backup ke waqt tha.</p><div class="row"><button class="g" onclick="document.getElementById('pv_rf').click()">Backup se restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)"></section>`;
+ if(!KEY)return hdr()+`<section class="card" style="text-align:center"><h3>PIN daalo</h3><input id="pv_p" type="password" inputmode="numeric" maxlength="10" autocomplete="off" autofocus onkeydown="if(event.key==='Enter')PVT.unlock()" style="text-align:center;font-size:24px;letter-spacing:8px"><div class="row" style="justify-content:center"><button onclick="PVT.unlock()">Unlock</button></div><p id="pv_e" class="w"></p><div class="row" style="justify-content:center"><button class="g" style="color:var(--bad)" onclick="PVT.forgot()">PIN bhool gaye</button></div></section>`;
+ return hdr('<button class="g" onclick="PVT.lock()">🔒 Lock</button>')+mainV()}
+function expTag(x){if(!x)return'';const n=dd(x,today());return n<0?' · <span class="w">⚠ expire '+dmy(x)+'</span>':n<=30?' · <span class="w">⏰ '+n+' din baaki</span>':' · exp '+dmy(x)}
+function filt(){const q=st.q.trim().toLowerCase();return M.docs.filter(d=>(!st.pid||d.pid==st.pid)&&(!q||[d.n,d.cat,d.note,(M.persons.find(p=>p.id==d.pid)||{}).n].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.t-a.t)}
+function rows(){const l=filt();if(!l.length)return`<p class="mu" style="text-align:center">${M.docs.length?'Kuch nahi mila':'Abhi koi document nahi. Pehle person banao, phir + Document dabao.'}</p>`;
+ return l.map(d=>{const p=M.persons.find(x=>x.id==d.pid);return`<div class="li" style="cursor:default"><label style="display:flex;gap:10px;align-items:center;margin:0;flex:1;min-width:0"><input type="checkbox" style="width:auto;margin:0;flex:none" ${st.sel.has(d.id)?'checked':''} onchange="PVT.tog('${d.id}',this.checked)"><span style="min-width:0"><b>${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${E(d.cat)} · ${d.pg.length} page${expTag(d.exp)}</span></span></label><button class="g" onclick="PVT.show('${d.id}')">Kholo</button></div>`}).join('')}
+function mainV(){
+ const c={};M.docs.forEach(d=>c[d.pid]=(c[d.pid]||0)+1);
+ const soon=M.docs.filter(d=>d.exp&&dd(d.exp,today())<=30).sort((a,b)=>a.exp<b.exp?-1:1);
+ const sp=st.pid?M.persons.find(p=>p.id==st.pid):null;
+ return(soon.length?`<section class="card"><h3>⏰ Expiry paas</h3>${soon.map(d=>`<div class="mu">${E(d.n)} (${E((M.persons.find(p=>p.id==d.pid)||{}).n||'-')})${expTag(d.exp)}</div>`).join('')}</section>`:'')+
+ `<section class="card"><h3>Person</h3><div class="row" style="margin:0"><button class="${st.pid?'g':''}" onclick="PVT.pick('')">Sab (${M.docs.length})</button>${M.persons.map(p=>`<button class="${st.pid==p.id?'':'g'}" onclick="PVT.pick('${p.id}')">${E(p.n)} (${c[p.id]||0})</button>`).join('')}<button class="g" onclick="PVT.pForm()">+ Person</button></div>${sp?`<div class="row"><button class="g" onclick="PVT.pForm('${sp.id}')">Naam badlo</button><button class="g" style="color:var(--bad)" onclick="PVT.pDel('${sp.id}')">${E(sp.n)} delete</button></div>`:''}</section>
+<section class="card"><input type="search" placeholder="Naam ya category se dhundo" value="${E(st.q)}" oninput="PVT.search(this.value)"><div class="row"><button onclick="PVT.dForm()">+ Document</button><button id="pv_ex" onclick="PVT.exDlg()">Export PDF (${st.sel.size})</button><button class="g" onclick="PVT.selAll()">Sab select</button><button class="g" onclick="PVT.selNone()">Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
+<section class="card"><h3>Backup</h3><p class="mu">Backup PIN se encrypted hota hai. ZIP bade data ke liye (file .pvz), JSON chhote data ke liye. Restore me file khud pehchani jati hai.</p><div class="row"><button onclick="PVT.bkZip()">ZIP backup</button><button class="g" onclick="PVT.bkJson()">JSON backup</button><button class="g" onclick="document.getElementById('pv_rf').click()">Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)"></section>`}
+function refresh(){const l=Q('#pv_list');if(l)l.innerHTML=rows();const b=Q('#pv_ex');if(b)b.textContent='Export PDF ('+st.sel.size+')'}
+const pick=id=>{st.pid=id;go()};
+const search=v=>{st.q=v;refresh()};
+const tog=(id,v)=>{v?st.sel.add(id):st.sel.delete(id);refresh2()};
+const refresh2=()=>{const b=Q('#pv_ex');if(b)b.textContent='Export PDF ('+st.sel.size+')'};
+const selAll=()=>{filt().forEach(d=>st.sel.add(d.id));refresh()};
+const selNone=()=>{st.sel.clear();refresh()};
+
+/* ---- setup / unlock ---- */
+async function setup(){const a=Q('#pv_a').value,b=Q('#pv_b').value,er=Q('#pv_e');
+ if(!/^\d{4,10}$/.test(a)){er.textContent='PIN sirf number, 4 se 10 digit';return}
+ if(a!==b){er.textContent='Dono PIN same nahi hain';return}
+ er.textContent='Lock ban raha hai…';
+ try{const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(a,salt);await saveLock(salt,k);KEY=k;M={persons:[],cats:[],docs:[]};await saveM();touch();go()}catch(x){KEY=null;er.textContent='Nahi bana: '+(x.message||x)}}
+async function unlock(){const i=Q('#pv_p'),er=Q('#pv_e'),m=meta();let L={};try{L=JSON.parse(localStorage.getItem(LKL)||'{}')}catch(x){}
+ if(L.until>Date.now()){er.textContent='Bahut galat try. '+Math.ceil((L.until-Date.now())/1e3)+' sec ruko.';i.value='';return}
+ er.textContent='Check ho raha hai…';
+ try{const k=await derive(i.value,s2b(m.s));if(dec.decode(await unseal(k,s2b(m.i),s2b(m.c)))!=='pvt-ok')throw 0;
+  const r=await iget('kv','meta');KEY=k;M=r?JSON.parse(dec.decode(await unseal(k,r.iv,r.ct))):{};norm();try{localStorage.removeItem(LKL)}catch(x){}touch();go()}
+ catch(x){KEY=null;M=null;const n=(L.n||0)+1,w=n>=5?Math.min(300,30*2**(n-5)):0;try{localStorage.setItem(LKL,JSON.stringify({n,until:w?Date.now()+w*1e3:0}))}catch(y){}er.textContent=w?'Bahut galat try. '+w+' sec ruko.':'Galat PIN';i.value=''}}
+async function forgot(){if(!confirm('Saare Pvt Documents hamesha ke liye delete honge aur naya lock banega. Bina PIN ke data wapas nahi aa sakta. Aage badhein?')||!confirm('Pakka? Ye undo nahi hoga.'))return;
+ try{await iclr('blob');await iclr('kv');localStorage.removeItem(LK);localStorage.removeItem(LKL);localStorage.removeItem(IXK)}catch(x){alert('Delete nahi hua: '+(x.message||x));return}go()}
+
+/* ---- dialog helper ---- */
+function dg(h){let d=Q('#pvd');if(!d){d=document.createElement('dialog');d.id='pvd';d.style.maxHeight='88vh';d.style.overflow='auto';document.body.appendChild(d);d.addEventListener('close',()=>{free()})}d.innerHTML='<form method="dialog" onsubmit="return false">'+h+'</form>';if(!d.open)d.showModal();touch()}
+const cl=()=>{const d=Q('#pvd');if(d&&d.open)d.close()};
+
+/* ---- persons ---- */
+function pForm(id){const p=id?M.persons.find(x=>x.id==id):null;dg(`<h3>${p?'Naam badlo':'Naya person'}</h3><label>Naam (Self, Papa, Ammi, customer...)<input id="pv_pn" value="${E(p?p.n:'')}" maxlength="40"></label><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" onclick="PVT.pSave('${id||''}')">Save</button></div>`)}
+async function pSave(id){const n=Q('#pv_pn').value.trim();if(!n){alert('Naam likho');return}
+ if(M.persons.some(p=>p.id!=id&&p.n.toLowerCase()==n.toLowerCase())){alert('Ye person pehle se hai');return}
+ try{if(id)M.persons.find(p=>p.id==id).n=n;else{const p={id:uid(),n};M.persons.push(p);st.pid=p.id}await saveM();cl();go()}catch(x){alert('Save nahi hua: '+(x.message||x))}}
+async function pDel(id){const p=M.persons.find(x=>x.id==id),ds=M.docs.filter(d=>d.pid==id);if(!p||!confirm(p.n+' aur uske '+ds.length+' document delete honge. Pakka?'))return;
+ try{for(const d of ds)for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(d=>d.pid!=id);M.persons=M.persons.filter(x=>x.id!=id);ds.forEach(d=>st.sel.delete(d.id));st.pid='';await saveM();go()}catch(x){alert('Delete nahi hua: '+(x.message||x))}}
+
+/* ---- add / edit document ---- */
+const catList=()=>CATS.concat(M.cats.filter(c=>!CATS.includes(c)));
+function dForm(id){
+ if(!M.persons.length){pForm();return}
+ const d=id?M.docs.find(x=>x.id==id):null;
+ PD={id:id||'',pend:[],rem:new Set(),old:d?d.pg.slice():[]};
+ dg(`<h3>${d?'Document edit':'Naya document'}</h3>
+<label>Person<select id="pv_dp">${M.persons.map(p=>`<option value="${p.id}" ${(d?d.pid==p.id:st.pid==p.id)?'selected':''}>${E(p.n)}</option>`).join('')}</select></label>
+<label>Category<select id="pv_dc">${catList().map(c=>`<option ${d&&d.cat==c?'selected':''}>${E(c)}</option>`).join('')}</select></label>
+<label>Ya nayi category<input id="pv_dn" maxlength="30" placeholder="optional"></label>
+<label>Naam<input id="pv_dm" maxlength="60" value="${E(d?d.n:'')}" placeholder="jaise Aadhaar Card"></label>
+<label>Note<textarea id="pv_dt" rows="2" maxlength="300">${E(d?d.note:'')}</textarea></label>
+<label>Expiry date (optional)<input id="pv_dx" type="date" value="${E(d&&d.exp||'')}"></label>
+<div class="row"><button type="button" onclick="document.getElementById('pv_fc').click()">📷 Camera</button><button type="button" class="g" onclick="document.getElementById('pv_fg').click()">🖼 Gallery</button><button type="button" class="g" onclick="document.getElementById('pv_ff').click()">📄 PDF / file</button></div>
+<input id="pv_fc" type="file" accept="image/*" capture="environment" hidden onchange="PVT.addF(this)"><input id="pv_fg" type="file" accept="image/*" multiple hidden onchange="PVT.addF(this)"><input id="pv_ff" type="file" accept="application/pdf,image/*" multiple hidden onchange="PVT.addF(this)">
+<div id="pv_pl"></div>
+<label style="display:flex;gap:10px;align-items:center;margin-top:8px"><input id="pv_dz" type="checkbox" style="width:auto;margin:0" checked> Photo ka size chhota karo</label>
+<p class="mu">Aadhaar jaise ke liye pehle Front, phir Back add karo.</p><p id="pv_de" class="w"></p>
+<div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_ds" onclick="PVT.dSave()">Save</button></div>`);
+ plist()}
+function plist(){const l=Q('#pv_pl');if(!l||!PD)return;
+ const old=PD.old.filter(g=>!PD.rem.has(g.id)).map((g,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${g.ty=='application/pdf'?'📄':'🖼'} Page ${i+1} <span class="mu">(saved, ${MB(g.sz)})</span></span><button type="button" class="g" onclick="PVT.rmOld('${g.id}')">✕</button></div>`).join('');
+ const nw=PD.pend.map((p,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${p.f.type=='application/pdf'?'📄':'🖼'} ${E(p.f.name||'photo')} <span class="mu">(${MB(p.f.size)})</span></span><span><button type="button" class="g" onclick="PVT.mvP(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.mvP(${i},1)">▼</button> <button type="button" class="g" onclick="PVT.rmP(${i})">✕</button></span></div>`).join('');
+ l.innerHTML=old+nw||'<p class="mu">Abhi koi page add nahi hua</p>'}
+function addF(i){const a=[...i.files];i.value='';a.forEach(f=>{if(f.type=='application/pdf'||/^image\//.test(f.type)||/\.pdf$/i.test(f.name))PD.pend.push({f})});plist()}
+const rmP=i=>{PD.pend.splice(i,1);plist()},rmOld=id=>{PD.rem.add(id);plist()};
+const mvP=(i,n)=>{const j=i+n;if(j<0||j>=PD.pend.length)return;[PD.pend[i],PD.pend[j]]=[PD.pend[j],PD.pend[i]];plist()};
+function loadImg(blob){return new Promise((ok,no)=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('Ye photo khul nahi paayi (format support nahi)'))};i.src=u})}
+async function jpegOf(blob,max,q){const i=await loadImg(blob),s=Math.min(1,max/Math.max(i.naturalWidth,i.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(i.naturalWidth*s));c.height=Math.max(1,Math.round(i.naturalHeight*s));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(i,0,0,c.width,c.height);
+ return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Photo convert nahi hui')),'image/jpeg',q))}
+async function prep(f,small){ // -> {u8,ty}
+ if(f.type=='application/pdf'||/\.pdf$/i.test(f.name))return{u8:new Uint8Array(await f.arrayBuffer()),ty:'application/pdf'};
+ if(!small&&(f.type=='image/jpeg'||f.type=='image/png'))return{u8:new Uint8Array(await f.arrayBuffer()),ty:f.type};
+ const b=await jpegOf(f,small?1800:4000,small?.82:.92);return{u8:new Uint8Array(await b.arrayBuffer()),ty:'image/jpeg'}}
+async function dSave(){
+ const er=Q('#pv_de'),pid=Q('#pv_dp').value,nc=Q('#pv_dn').value.trim(),cat=nc||Q('#pv_dc').value,n=Q('#pv_dm').value.trim(),note=Q('#pv_dt').value.trim(),exp=Q('#pv_dx').value,sm=Q('#pv_dz').checked;
+ if(!n){er.textContent='Document ka naam likho';return}
+ const keep=PD.old.filter(g=>!PD.rem.has(g.id));if(!keep.length&&!PD.pend.length){er.textContent='Kam se kam ek page add karo';return}
+ const b=Q('#pv_ds');b.disabled=true;const added=[];
+ try{for(let i=0;i<PD.pend.length;i++){er.textContent='Save ho raha hai… '+(i+1)+'/'+PD.pend.length;const r=await prep(PD.pend[i].f,sm),id=uid()+i;await putF(id,r.u8);added.push({id,ty:r.ty,sz:r.u8.length})}
+  er.textContent='';
+  let d=PD.id?M.docs.find(x=>x.id==PD.id):null;
+  if(!d){d={id:uid(),t:Date.now()};M.docs.push(d)}
+  Object.assign(d,{pid,cat,n,note,exp,pg:keep.concat(added)});
+  if(nc&&!catList().includes(nc))M.cats.push(nc);
+  await saveM();for(const g of PD.old)if(PD.rem.has(g.id))await idel('blob',g.id);
+  PD=null;cl();go()}
+ catch(x){for(const g of added){try{await idel('blob',g.id)}catch(y){}}b.disabled=false;er.textContent='Save nahi hua: '+(x.message||x)}}
+
+/* ---- view / delete ---- */
+async function show(id){const d=M.docs.find(x=>x.id==id);if(!d)return;const p=M.persons.find(x=>x.id==d.pid);
+ dg(`<h3>${E(d.n)}</h3><p class="mu">${E(p?p.n:'-')} · ${E(d.cat)}${expTag(d.exp)}</p>${d.note?`<p>${E(d.note)}</p>`:''}<div id="pv_vw"><p class="mu">Khul raha hai…</p></div><div class="row"><button type="button" onclick="PVT.exDlg(['${d.id}'])">PDF</button><button type="button" class="g" onclick="PVT.dForm('${d.id}')">Edit</button><button type="button" class="g" style="color:var(--bad)" onclick="PVT.dDel('${d.id}')">Delete</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`);
+ try{let h='';for(let i=0;i<d.pg.length;i++){const g=d.pg[i],u=await getF(g.id),b=new Blob([u],{type:g.ty}),url=URL.createObjectURL(b);urls.push(url);
+  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default"><span>📄 PDF page ${i+1}</span><button type="button" class="g" onclick="PVT.pgOut('${d.id}',${i})">Share / Save</button></div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
+  const v=Q('#pv_vw');if(v)v.innerHTML=h}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Khul nahi paya: '+E(x.message||x)+'</p>'}}
+async function pgOut(id,i){const d=M.docs.find(x=>x.id==id),g=d.pg[i];try{const u=await getF(g.id);LAST={name:fsn(d.n)+(g.ty=='application/pdf'?'.pdf':g.ty=='image/png'?'.png':'.jpg'),blob:new Blob([u],{type:g.ty})};await send()}catch(x){alert(x.message||x)}}
+async function dDel(id){const d=M.docs.find(x=>x.id==id);if(!d||!confirm(d.n+' delete karna hai?'))return;
+ try{for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(x=>x.id!=id);st.sel.delete(id);await saveM();cl();go()}catch(x){alert('Delete nahi hua: '+(x.message||x))}}
+
+/* ---- export PDF ---- */
+const fsn=s=>String(s).replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim()||'file';
+const fdate=()=>{const d=new Date(),M_=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(d.getDate()).padStart(2,'0')+M_[d.getMonth()]+d.getFullYear()};
+function exDlg(ids){
+ exs=(ids||[...st.sel]).filter(id=>M.docs.some(d=>d.id==id));
+ if(!exs.length){alert('Pehle documents select karo (tick karo)');return}
+ dg(`<h3>Export PDF</h3><div id="pv_xl"></div>
+<label>Kaise<select id="pv_xm"><option value="one">Ek hi PDF</option><option value="many">Alag-alag PDF (ZIP me)</option></select></label>
+<label>Quality<select id="pv_xq"><option value="o">Original</option><option value="m" selected>Medium (chhoti file)</option><option value="s">Small (sabse chhoti)</option></select></label>
+<label style="display:flex;gap:10px;align-items:center"><input id="pv_x2" type="checkbox" style="width:auto;margin:0" checked> 2 page wale (Aadhaar Front+Back) ek A4 page par</label>
+<p id="pv_xe" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_xb" onclick="PVT.exRun()">PDF banao</button></div>`);
+ xl()}
+function xl(){const l=Q('#pv_xl');if(!l)return;l.innerHTML=exs.map((id,i)=>{const d=M.docs.find(x=>x.id==id),p=M.persons.find(x=>x.id==d.pid);return`<div class="li" style="cursor:default;padding:8px 0"><span style="min-width:0"><b>${i+1}. ${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${d.pg.length} page</span></span><span style="white-space:nowrap"><button type="button" class="g" onclick="PVT.xmv(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.xmv(${i},1)">▼</button></span></div>`}).join('')}
+const xmv=(i,n)=>{const j=i+n;if(j<0||j>=exs.length)return;[exs[i],exs[j]]=[exs[j],exs[i]];xl()};
+async function exRun(){
+ const er=Q('#pv_xe'),b=Q('#pv_xb'),mode=Q('#pv_xm').value,ql=Q('#pv_xq').value,two=Q('#pv_x2').checked;b.disabled=true;er.textContent='Library load ho rahi hai…';
+ try{await PLL();const P=PDFLib.PDFDocument,W=595.28,H=841.89,G=28,docs=exs.map(id=>M.docs.find(x=>x.id==id)).filter(Boolean);
+  const fit=(pg,im,x,y,w,h)=>{const s=Math.min(w/im.width,h/im.height),iw=im.width*s,ih=im.height*s;pg.drawImage(im,{x:x+(w-iw)/2,y:y+(h-ih)/2,width:iw,height:ih})};
+  const emb=async(pdf,g)=>{let u=await getF(g.id);if(ql!='o'){const b=await jpegOf(new Blob([u],{type:g.ty}),ql=='m'?1600:1100,ql=='m'?.78:.6);u=new Uint8Array(await b.arrayBuffer());return pdf.embedJpg(u)}return g.ty=='image/png'?pdf.embedPng(u):pdf.embedJpg(u)};
+  let done=0;const total=docs.reduce((a,d)=>a+d.pg.length,0);
+  const addDoc=async(pdf,d)=>{const all=d.pg.length==2&&d.pg.every(g=>g.ty!='application/pdf');
+   if(two&&all){const a=await emb(pdf,d.pg[0]),c=await emb(pdf,d.pg[1]),pg=pdf.addPage([W,H]),h=H/2-G-8;fit(pg,a,G,H/2+8,W-2*G,h);fit(pg,c,G,G,W-2*G,h);done+=2;er.textContent='PDF ban rahi hai… '+done+'/'+total;return}
+   for(const g of d.pg){if(g.ty=='application/pdf'){const src=await P.load(await getF(g.id),{ignoreEncryption:true}),cp=await pdf.copyPages(src,src.getPageIndices());cp.forEach(x=>pdf.addPage(x))}
+    else{const im=await emb(pdf,g),pg=pdf.addPage([W,H]);fit(pg,im,G,G,W-2*G,H-2*G)}done++;er.textContent='PDF ban rahi hai… '+done+'/'+total}};
+  if(mode=='one'||docs.length==1){const pdf=await P.create();for(const d of docs)await addDoc(pdf,d);const u=await pdf.save();LAST={name:(docs.length==1?fsn(d0(docs[0])):'PvtDocs-'+fdate())+'.pdf',blob:new Blob([u],{type:'application/pdf'})}}
+  else{await JZL();const z=new JSZip(),used=new Set();for(const d of docs){const pdf=await P.create();await addDoc(pdf,d);let n=fsn(d0(d)),k=n,i=2;while(used.has(k.toLowerCase()))k=n+' ('+i++ +')';used.add(k.toLowerCase());z.file(k+'.pdf',await pdf.save())}
+   LAST={name:'PvtDocs-'+fdate()+'.zip',blob:await z.generateAsync({type:'blob',compression:'STORE'})}}
+  dg(`<h3>PDF ready</h3><p class="mu">${E(LAST.name)} · ${MB(LAST.blob.size)}</p><div class="row"><button type="button" onclick="PVT.send()">Share</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
+ catch(x){b.disabled=false;er.textContent='PDF nahi bani: '+(x.message||x)}}
+const d0=d=>{const p=M.persons.find(x=>x.id==d.pid);return(p?p.n+' - ':'')+d.n};
+
+/* ---- send / save a prepared file ---- */
+async function send(){if(!LAST)return;const{name,blob}=LAST;try{if(typeof NAT=='function'&&NAT()){await nativeShare(name,await b64(blob),false);return}
+ const f=new File([blob],name,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return}save()}catch(x){if(x&&x.name==='AbortError')return;alert('Share nahi hua: '+(x.message||x))}}
+function save(){if(!LAST)return;const a=document.createElement('a');a.href=URL.createObjectURL(LAST.blob);a.download=LAST.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+
+/* ---- backup ---- */
+const manifest=()=>({v:1,persons:M.persons,cats:M.cats,docs:M.docs});
+async function bkZip(){try{await JZL();const z=new JSZip();z.file('data.json',JSON.stringify(manifest()));for(const d of M.docs)for(const g of d.pg)z.file('files/'+g.id,await getF(g.id));
+ const u=await z.generateAsync({type:'uint8array',compression:'STORE'}),c=await seal(KEY,u),salt=s2b(meta().s),o=new Uint8Array(32+c.ct.length);o.set([80,86,84,49],0);o.set(salt,4);o.set(c.iv,20);o.set(c.ct,32);
+ bkDone('PvtDocs-'+fdate()+'.pvz',new Blob([o],{type:'application/octet-stream'}))}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
+async function bkJson(){try{const tot=M.docs.reduce((a,d)=>a+d.pg.reduce((b,g)=>b+g.sz,0),0);if(tot*1.4>50e6&&!confirm('JSON backup lagbhag '+MB(tot*1.4)+' ka hoga aur phone me hang ho sakta hai. ZIP behtar hai. Phir bhi JSON banayein?'))return;
+ const files={};for(const d of M.docs)for(const g of d.pg)files[g.id]=b2s(await getF(g.id));
+ const m=manifest();m.files=files;const c=await seal(KEY,enc.encode(JSON.stringify(m)));
+ bkDone('PvtDocs-'+fdate()+'.json',new Blob([JSON.stringify({pvt:1,s:meta().s,i:b2s(c.iv),c:b2s(c.ct)})],{type:'application/json'}))}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
+function bkDone(name,blob){LAST={name,blob};dg(`<h3>Backup ready</h3><p class="mu">${E(name)} · ${MB(blob.size)}</p><p class="mu">Ise Drive ya WhatsApp me save kar lo. Restore ke waqt yahi PIN chahiye.</p><div class="row"><button type="button" onclick="PVT.send()">Share / Save</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
+
+/* ---- restore ---- */
+async function restPick(inp){const fl=inp.files&&inp.files[0];inp.value='';if(!fl)return;
+ try{const u=new Uint8Array(await fl.arrayBuffer());
+  if(u.length>48&&u[0]==80&&u[1]==86&&u[2]==84&&u[3]==49)RS={kind:'zip',salt:u.slice(4,20),iv:u.slice(20,32),ct:u.slice(32)};
+  else{const o=JSON.parse(dec.decode(u));if(!o||o.pvt!==1)throw 0;RS={kind:'json',salt:s2b(o.s),iv:s2b(o.i),ct:s2b(o.c)}}}
+ catch(x){RS=null;alert('Ye Pvt Documents ki backup file nahi lagti');return}
+ dg(`<h3>Restore</h3><p class="mu">${E(fl.name)} (${RS.kind=='zip'?'ZIP':'JSON'} backup)</p><label>Backup ke waqt wala PIN<input id="pv_rp" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label>${KEY?`<label>Kaise<select id="pv_rm"><option value="merge">Merge (naye jud jayenge, purane waise hi)</option><option value="replace">Replace (sab kuch backup wala ho jayega)</option></select></label>`:''}<p id="pv_re" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_rb" onclick="PVT.restRun()">Restore</button></div>`)}
+async function restRun(){
+ const er=Q('#pv_re'),b=Q('#pv_rb'),pin=Q('#pv_rp').value,mode=Q('#pv_rm')?Q('#pv_rm').value:'replace';
+ if(!/^\d{4,10}$/.test(pin)){er.textContent='PIN daalo';return}
+ b.disabled=true;er.textContent='Check ho raha hai…';let k,man,getB;
+ try{k=await derive(pin,RS.salt);const pt=await unseal(k,RS.iv,RS.ct);
+  if(RS.kind=='zip'){await JZL();const z=await JSZip.loadAsync(pt);man=JSON.parse(await z.file('data.json').async('string'));getB=async id=>z.file('files/'+id).async('uint8array');man._has=id=>!!z.file('files/'+id)}
+  else{man=JSON.parse(dec.decode(pt));getB=async id=>s2b(man.files[id]);man._has=id=>typeof man.files[id]=='string'}
+  if(!man||!Array.isArray(man.persons)||!Array.isArray(man.docs))throw new Error('x');
+  for(const p of man.persons)if(!p||!IDR.test(String(p.id))||typeof p.n!='string')throw new Error('x');
+  for(const d of man.docs){if(!d||!IDR.test(String(d.id))||!Array.isArray(d.pg)||typeof d.n!='string'||!d.pg.length)throw new Error('x');for(const g of d.pg)if(!g||!IDR.test(String(g.id))||!TYS.includes(g.ty)||!man._has(g.id))throw new Error('x')}
+ }catch(x){b.disabled=false;er.textContent='Galat PIN ya file kharab hai. Kuch nahi badla.';return}
+ const prev=KEY,oldM=M;let added=0,dup=0;
+ try{
+  if(!prev){KEY=k;M={persons:[],cats:[],docs:[]};await iclr('blob')}
+  else if(mode=='replace'){if(!confirm('Abhi ka saara Pvt data hat kar backup wala aayega. Pakka?')){b.disabled=false;er.textContent='';return}}
+  const tgt=(!prev||mode=='replace')?{persons:[],cats:[],docs:[]}:M,pm={},oldIds=new Set();
+  if(prev&&mode=='replace')M.docs.forEach(d=>d.pg.forEach(g=>oldIds.add(g.id)));
+  const fp=d=>[d.pid,d.cat,d.n.toLowerCase(),d.pg.reduce((a,g)=>a+(+g.sz||0),0)].join('|'),fps=new Set(tgt.docs.map(fp)),ids=new Set(tgt.docs.map(d=>d.id));
+  for(const p of man.persons){let e=tgt.persons.find(x=>x.id==p.id)||tgt.persons.find(x=>x.n.toLowerCase()==p.n.toLowerCase());if(!e){e={id:p.id,n:p.n};tgt.persons.push(e)}pm[p.id]=e.id}
+  (man.cats||[]).forEach(c=>{if(typeof c=='string'&&!tgt.cats.includes(c)&&!CATS.includes(c))tgt.cats.push(c)});
+  let i=0;const newIds=new Set();
+  for(const d of man.docs){i++;er.textContent='Restore ho raha hai… '+i+'/'+man.docs.length;
+   const nd={id:d.id,pid:pm[d.pid]||tgt.persons[0]&&tgt.persons[0].id||'',cat:String(d.cat||'Other'),n:d.n,note:String(d.note||''),exp:String(d.exp||''),t:+d.t||Date.now(),pg:d.pg.map(g=>({id:g.id,ty:g.ty,sz:+g.sz||0}))};
+   if(!nd.pid){const p={id:uid(),n:'Other'};tgt.persons.push(p);nd.pid=p.id}
+   if(ids.has(nd.id)||fps.has(fp(nd))){dup++;continue}
+   for(const g of nd.pg){const u=await getB(g.id);g.sz=u.length;await putF(g.id,u);newIds.add(g.id)}
+   tgt.docs.push(nd);ids.add(nd.id);fps.add(fp(nd));added++}
+  M=tgt;await saveM();
+  if(prev&&mode=='replace')for(const id of oldIds)if(!newIds.has(id)){try{await idel('blob',id)}catch(x){}}
+  if(!prev){await saveLock(RS.salt,k)}
+  st.sel.clear();st.pid='';RS=null;touch();
+  dg(`<h3>Restore ho gaya ✓</h3><p>${added} document jude${dup?', '+dup+' duplicate chhode':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">Theek hai</button></div>`);go()}
+ catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore beech me ruk gaya: '+(x.message||x)}}
+
+return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,restPick,restRun,cl}
+})();
 </script><script>/* ===== Cloud sync (Supabase) : login + auto save/load, local-first. Token/session backup me nahi jata ===== */
 window.CLD=(()=>{
 const CFG={url:'https://qiaxmsqsvrkpeybropau.supabase.co',key:'sb_publishable_PWpJGjLJ2olYnKoyhCmdYA_h6b5E7is'},SK='bijli_cloud_v1';
@@ -2583,7 +2834,7 @@ let ss=null,busy=0,conflict=0,ready=0,last=null,pend=null,msg='',bad=0;
 try{ss=JSON.parse(localStorage.getItem(SK))}catch(x){}
 const persist=()=>{try{ss?localStorage.setItem(SK,JSON.stringify(ss)):localStorage.removeItem(SK)}catch(x){}};
 const canon=o=>o===null||typeof o!='object'?JSON.stringify(o):Array.isArray(o)?'['+o.map(canon).join(',')+']':'{'+Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+canon(o[k])).join(',')+'}';
-const payloadObj=()=>{const o=JSON.parse(bkJson());delete o.lastBk;return o};
+const payloadObj=()=>{const o=JSON.parse(bkJson());delete o.lastBk;delete o.pvt;return o};
 const hasData=()=>{try{return (S.meters&&S.meters.length)||(S.cycles&&S.cycles.length)||((S.solar&&S.solar.meters)||[]).length||(window.SOL&&SOL.exp().meters.length)}catch(x){return false}};
 const hm=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 function setSt(t,b){msg=t;bad=b?1:0;const p=$('#cl_st');if(p){p.textContent=t;p.className=b?'w':'mu'}}
