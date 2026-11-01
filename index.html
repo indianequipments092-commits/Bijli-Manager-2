@@ -3514,7 +3514,9 @@ const PDFV=(()=>{
  async function check(t){
   if(!window.PdfIntent)return;t=t||0;
   try{const r=window.PdfIntent.take();if(r=='wait'){if(t<60)setTimeout(()=>check(t+1),300);return}if(!r)return;
-   const k=r.indexOf('|'),path=r.slice(0,k),name=r.slice(k+1)||'PDF',url=(window.Capacitor&&Capacitor.convertFileSrc)?Capacitor.convertFileSrc('file://'+path):'file://'+path,res=await fetch(url);
+   const k=r.indexOf('|'),path=r.slice(0,k),name=r.slice(k+1)||'PDF';
+   if(window.PdfIntent.read){const b=window.PdfIntent.read(path);if(!b)throw new Error('File padhi nahi gayi');const bin=atob(b),u=new Uint8Array(bin.length);for(let q=0;q<bin.length;q++)u[q]=bin.charCodeAt(q);open(u,name);return}
+   const url=(window.Capacitor&&Capacitor.convertFileSrc)?Capacitor.convertFileSrc('file://'+path):'file://'+path,res=await fetch(url);
    if(!res.ok)throw new Error('File padhi nahi gayi');open(new Uint8Array(await res.arrayBuffer()),name)}
   catch(x){alert('PDF khul nahi paya: '+((x&&x.message)||x))}}
  addEventListener('load',()=>setTimeout(check,600));
