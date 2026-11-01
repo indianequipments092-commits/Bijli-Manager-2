@@ -2584,11 +2584,13 @@ button.pqic{padding:8px;min-width:36px}
 .bar h2.pqt{display:flex;align-items:center;gap:7px;min-width:0;font-size:18px;white-space:nowrap}.pqt .pqi{width:22px;height:22px;color:var(--am)}
 .pqh{display:flex;align-items:center;gap:8px}.pqh .pqi{color:var(--am)}
 .pqhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.pqhd h3{margin:0}
-.pqchips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.pqchips::-webkit-scrollbar{display:none}
+.pqchips{position:relative;display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.pqchips::-webkit-scrollbar{display:none}
 button.g.pqchip{flex:none;display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:8px 15px;font-weight:600;white-space:nowrap}
 button.g.pqchip small{font-size:12px;font-weight:700;opacity:.6;font-variant-numeric:tabular-nums}
 button.g.pqchip.on{background:linear-gradient(135deg,var(--am),color-mix(in srgb,var(--am) 75%,#fff));border-color:transparent;color:#1a1200;box-shadow:0 8px 18px -10px var(--am)}
 button.g.pqchip.on small{opacity:.75}
+button.g.pqchip,button.g.pqchip:focus,button.g.pqchip:focus-visible,button.g.pql:focus-visible{outline:none;-webkit-tap-highlight-color:transparent}
+.pqchips.pqf{margin:8px -2px 0}
 .pqact{display:flex;align-items:center;gap:2px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--br)}
 .pqwho{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mu);margin-right:auto;min-width:0}.pqwho b{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42vw}
 button.g.pql{border:0;background:transparent;padding:7px 10px;border-radius:10px;font-size:13px;font-weight:600;color:var(--ac);display:inline-flex;align-items:center;gap:6px;box-shadow:none}
@@ -2601,7 +2603,7 @@ window.PVT=(()=>{
 const LK='bijli_pvt_v1',LKL='bijli_pvt_lk',IXK='bijli_pvt_idx',IT=3e5,IDLE=12e4,IDR=/^[A-Za-z0-9_-]{1,40}$/,TYS=['image/jpeg','image/png','application/pdf'];
 const CATS=['Aadhaar','PAN','Voter ID','Driving Licence','Passport','Bank','Property','Other'];
 let ON=0,KEY=null,M=null,idle=0,hidAt=0,urls=[],PD=null,RS=null,LAST=null,exs=[];
-const st={pid:'',q:'',sel:new Set()};
+const st={pid:'',q:'',cat:'',exp:0,sel:new Set()};let CL=[];
 const E=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const Q=s=>document.querySelector(s),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const enc=new TextEncoder(),dec=new TextDecoder();
@@ -2671,7 +2673,7 @@ async function saveLock(salt,k){const c=await seal(k,enc.encode('pvt-ok')),r={s:
 /* ---- lock state ---- */
 function touch(){clearTimeout(idle);if(KEY)idle=setTimeout(lock,IDLE)}
 function free(){urls.forEach(u=>URL.revokeObjectURL(u));urls=[]}
-function lock(){KEY=null;M=null;PD=null;exs=[];st.sel.clear();st.q='';st.pid='';clearTimeout(idle);free();const d=Q('#pvd');if(d&&d.open)d.close();if(ON)go()}
+function lock(){KEY=null;M=null;PD=null;exs=[];st.sel.clear();st.q='';st.pid='';st.cat='';st.exp=0;clearTimeout(idle);free();const d=Q('#pvd');if(d&&d.open)d.close();if(ON)go()}
 ['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,()=>{if(KEY)touch()},{passive:true,capture:true}));
 document.addEventListener('visibilitychange',()=>{if(!KEY)return;if(document.hidden)hidAt=Date.now();else if(hidAt&&Date.now()-hidAt>6e4)lock();else touch()});
 const open=()=>{ON=1;go();scrollTo(0,0)};
@@ -2688,21 +2690,30 @@ function view(){
  if(!KEY)return hdr()+`<section class="card" style="text-align:center"><h3 class="pqh" style="justify-content:center">${I('lock')}Enter PIN</h3><input id="pv_p" type="password" inputmode="numeric" maxlength="10" autocomplete="off" autofocus onkeydown="if(event.key==='Enter')PVT.unlock()" style="text-align:center;font-size:24px;letter-spacing:8px"><div class="row" style="justify-content:center"><button class="pqb" onclick="PVT.unlock()">${I('unlock')}Unlock</button></div><p id="pv_e" class="w"></p><div class="row" style="justify-content:center"><button class="g pqb" style="color:var(--bad)" onclick="PVT.forgot()">${I('key')}Forgot PIN</button></div></section>`;
  return hdr('<button class="g pqb" onclick="PVT.lock()">'+I('lock')+'Lock</button>')+mainV()}
 function expTag(x){if(!x)return'';const n=dd(x,today());return n<0?' · <span class="w">'+I('warn','s')+' Expired '+dmy(x)+'</span>':n<=30?' · <span class="w">'+I('clock','s')+' '+n+' day'+(n==1?'':'s')+' left</span>':' · Exp '+dmy(x)}
-function filt(){const q=st.q.trim().toLowerCase();return M.docs.filter(d=>(!st.pid||d.pid==st.pid)&&(!q||[d.n,d.cat,d.note,(M.persons.find(p=>p.id==d.pid)||{}).n].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.t-a.t)}
-function rows(){const l=filt();if(!l.length)return`<div class="pqem">${I('folder')}<p class="mu">${M.docs.length?'Nothing found':'No documents yet. Add a person first, then tap + Document.'}</p></div>`;
+function filt(){const q=st.q.trim().toLowerCase();return M.docs.filter(d=>(!st.pid||d.pid==st.pid)&&(!st.cat||d.cat==st.cat)&&(!st.exp||(d.exp&&dd(d.exp,today())<=30))&&(!q||[d.n,d.cat,d.note,(M.persons.find(p=>p.id==d.pid)||{}).n].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.t-a.t)}
+function rows(){const l=filt();if(!l.length){const any=st.pid||st.cat||st.exp||st.q.trim();return`<div class="pqem">${I('folder')}<p class="mu">${M.docs.length?'Nothing found':'No documents yet. Add a person first, then tap + Document.'}</p>${M.docs.length&&any?`<button class="g pqb pqs" style="margin-top:10px" onclick="PVT.clrF()">${I('x')}Clear filters</button>`:''}</div>`}
  return l.map(d=>{const p=M.persons.find(x=>x.id==d.pid),n=d.pg.length;return`<div class="li" style="cursor:default"><label style="display:flex;gap:10px;align-items:center;margin:0;flex:1;min-width:0"><input type="checkbox" style="width:auto;margin:0;flex:none" ${st.sel.has(d.id)?'checked':''} onchange="PVT.tog('${d.id}',this.checked)"><span style="min-width:0"><b>${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${E(d.cat)} · ${n} page${n==1?'':'s'}${expTag(d.exp)}</span></span></label><button class="g pqb pqs" onclick="PVT.show('${d.id}')">${I('eye')}Open</button></div>`}).join('')}
 function mainV(){
  const c={};M.docs.forEach(d=>c[d.pid]=(c[d.pid]||0)+1);
  const soon=M.docs.filter(d=>d.exp&&dd(d.exp,today())<=30).sort((a,b)=>a.exp<b.exp?-1:1);
  const sp=st.pid?M.persons.find(p=>p.id==st.pid):null;
+ const base=M.docs.filter(d=>!st.pid||d.pid==st.pid),cc={};base.forEach(d=>cc[d.cat]=(cc[d.cat]||0)+1);
+ const ord=catList();CL=Object.keys(cc).sort((a,b)=>{const x=ord.indexOf(a),y=ord.indexOf(b);return(x<0?99:x)-(y<0?99:y)});
+ if(st.cat&&!cc[st.cat])st.cat='';
+ const nExp=base.filter(d=>d.exp&&dd(d.exp,today())<=30).length;
+ const fchip=(on,oc,ic,lab,n)=>`<button class="g pqchip${on?' on':''}" onclick="${oc}">${ic}${lab}<small>${n}</small></button>`;
+ const fl=`<div class="pqchips pqf">${fchip(!st.cat,'PVT.pickCat(-1)','','All types',base.length)}${nExp||st.exp?fchip(st.exp,'PVT.pickExp()',I('clock','s'),'Expiring',nExp):''}${CL.map((k,i)=>fchip(st.cat==k,'PVT.pickCat('+i+')','',E(k),cc[k])).join('')}</div>`;
  const chip=(id,nm,n)=>`<button class="g pqchip${st.pid==id?' on':''}" onclick="PVT.pick('${id}')">${nm}<small>${n}</small></button>`;
  return(soon.length?`<section class="card"><h3 class="pqh">${I('clock')}Expiring soon</h3>${soon.map(d=>`<div class="mu">${E(d.n)} (${E((M.persons.find(p=>p.id==d.pid)||{}).n||'-')})${expTag(d.exp)}</div>`).join('')}</section>`:'')+
  `<section class="card"><div class="pqhd"><h3 class="pqh">${I('users')}Person</h3><button class="g pqb pqs" onclick="PVT.pForm()">${I('plus')}Person</button></div><div class="pqchips">${chip('','All',M.docs.length)}${M.persons.map(p=>chip(p.id,E(p.n),c[p.id]||0)).join('')}</div>${sp?`<div class="pqact"><span class="pqwho">${I('user')}<b>${E(sp.n)}</b></span><button class="g pql" onclick="PVT.pForm('${sp.id}')">${I('pencil')}Rename</button><button class="g pql pqdel" onclick="PVT.pDel('${sp.id}')">${I('trash')}Delete</button></div>`:''}</section>
-<section class="card"><div class="pqsr">${I('search')}<input type="search" placeholder="Search by name or category" value="${E(st.q)}" oninput="PVT.search(this.value)"></div><div class="row"><button class="pqb" onclick="PVT.dForm()">${I('fileplus')}Document</button><button id="pv_ex" class="pqb" onclick="PVT.exDlg()">${I('filedown')}<span id="pv_exn">Export PDF (${st.sel.size})</span></button><button class="g pqb" onclick="PVT.selAll()">${I('checksq')}Select all</button><button class="g pqb" onclick="PVT.selNone()">${I('x')}Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
+<section class="card"><div class="pqsr">${I('search')}<input type="search" placeholder="Search by name or category" value="${E(st.q)}" oninput="PVT.search(this.value)"></div>${fl}<div class="row"><button class="pqb" onclick="PVT.dForm()">${I('fileplus')}Document</button><button id="pv_ex" class="pqb" onclick="PVT.exDlg()">${I('filedown')}<span id="pv_exn">Export PDF (${st.sel.size})</span></button><button class="g pqb" onclick="PVT.selAll()">${I('checksq')}Select all</button><button class="g pqb" onclick="PVT.selNone()">${I('x')}Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
 <section class="card"><h3 class="pqh">${I('archive')}Backup</h3><p class="mu">Backups are encrypted with your PIN. Use ZIP for large data (.pvz file) and JSON for small data. The file type is detected automatically on restore.</p><div class="row"><button class="pqb" onclick="PVT.bkZip()">${I('archive')}ZIP backup</button><button class="g pqb" onclick="PVT.bkJson()">${I('braces')}JSON backup</button><button class="g pqb" onclick="document.getElementById('pv_rf').click()">${I('upload')}Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)">
 <h3 class="pqh" style="margin-top:16px">${I('cloud')}Cloud backup (Supabase)</h3><p class="mu">The encrypted .pvz file goes to a private folder under your login. You must be signed in through Cloud sync in Bijli Settings. It uploads only when you tap the button.</p><div class="row"><button class="pqb" onclick="PVT.cloudUp()">${I('cloudup')}Cloud backup</button><button class="g pqb" onclick="PVT.cloudDown()">${I('clouddown')}Cloud restore</button></div><p id="pv_cs" class="mu"></p><p id="pv_cl" class="mu">${(()=>{try{const w=localStorage.getItem(CBK);return w?'Last cloud backup: '+E(w):''}catch(x){return''}})()}</p></section>`}
 function refresh(){const l=Q('#pv_list');if(l)l.innerHTML=rows();refresh2()}
-const fixChip=()=>setTimeout(()=>{const c=Q('.pqchip.on'),w=Q('.pqchips');if(c&&w)w.scrollLeft=c.offsetLeft-(w.clientWidth-c.offsetWidth)/2},0);
+const fixChip=()=>setTimeout(()=>{document.querySelectorAll('.pqchips').forEach(w=>{const c=w.querySelector('.pqchip.on');if(c)w.scrollLeft=c.offsetLeft-(w.clientWidth-c.offsetWidth)/2})},0);
+const pickCat=i=>{st.cat=i<0?'':(CL[i]||'');go();fixChip()};
+const pickExp=()=>{st.exp=st.exp?0:1;go();fixChip()};
+const clrF=()=>{st.pid='';st.cat='';st.exp=0;st.q='';go();fixChip()};
 const pick=id=>{st.pid=id;go();fixChip()};
 const search=v=>{st.q=v;refresh()};
 const tog=(id,v)=>{v?st.sel.add(id):st.sel.delete(id);refresh2()};
@@ -2934,7 +2945,7 @@ async function restRun(){
   dg(`<h3 class="pqh">${I('done')}Restore complete</h3><p>${added} document(s) added${dup?', '+dup+' duplicate(s) skipped':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">OK</button></div>`);go()}
  catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore stopped midway: '+(x.message||x)}}
 
-return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,unPdf,unSaved,restPick,restRun,cl}
+return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,pickCat,pickExp,clrF,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,unPdf,unSaved,restPick,restRun,cl}
 })();
 </script><script>/* ===== Cloud sync (Supabase) : login + auto save/load, local-first. Token/session backup me nahi jata ===== */
 window.CLD=(()=>{
