@@ -2597,6 +2597,7 @@ button.g.pql{border:0;background:transparent;padding:7px 10px;border-radius:10px
 button.g.pql.pqdel{color:var(--bad)}
 button.g.pql:active{background:color-mix(in srgb,currentColor 12%,transparent)}
 .pqsr{position:relative}.pqsr .pqi{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none}.pqsr input{width:100%;box-sizing:border-box;padding-left:38px}
+.pqpp{width:100%;margin:8px 0 4px}.pqpc{display:block;width:100%;height:auto;border-radius:10px;border:1px solid var(--br);margin:0 0 8px;background:#fff;cursor:zoom-in}
 .pqem{text-align:center;padding:14px 0}.pqem .pqi{width:34px;height:34px;opacity:.55;display:block;margin:0 auto 6px;color:var(--mu)}.pqem p{margin:0}
 </style><script>/* ===== More > Pvt Documents (PIN lock, AES-GCM encrypted, IndexedDB, own storage; does not touch Bijli data) ===== */
 window.PVT=(()=>{
@@ -2672,7 +2673,8 @@ async function saveLock(salt,k){const c=await seal(k,enc.encode('pvt-ok')),r={s:
 
 /* ---- lock state ---- */
 function touch(){clearTimeout(idle);if(KEY)idle=setTimeout(lock,IDLE)}
-function free(){urls.forEach(u=>URL.revokeObjectURL(u));urls=[]}
+let pdocs=[],curTok=0;
+function free(){urls.forEach(u=>URL.revokeObjectURL(u));urls=[];curTok++;pdocs.forEach(d=>{try{d.destroy()}catch(x){}});pdocs=[]}
 function lock(){KEY=null;M=null;PD=null;exs=[];st.sel.clear();st.q='';st.pid='';st.cat='';st.exp=0;clearTimeout(idle);free();const d=Q('#pvd');if(d&&d.open)d.close();if(ON)go()}
 ['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,()=>{if(KEY)touch()},{passive:true,capture:true}));
 document.addEventListener('visibilitychange',()=>{if(!KEY)return;if(document.hidden)hidAt=Date.now();else if(hidAt&&Date.now()-hidAt>6e4)lock();else touch()});
@@ -2801,9 +2803,23 @@ async function dSave(){
 /* ---- view / delete ---- */
 async function show(id){const d=M.docs.find(x=>x.id==id);if(!d)return;const p=M.persons.find(x=>x.id==d.pid);
  dg(`<h3>${E(d.n)}</h3><p class="mu">${E(p?p.n:'-')} · ${E(d.cat)}${expTag(d.exp)}</p>${d.note?`<p>${E(d.note)}</p>`:''}<div id="pv_vw"><p class="mu">Opening…</p></div><div class="row"><button type="button" class="pqb" onclick="PVT.exDlg(['${d.id}'])">${I('filedown')}PDF</button><button type="button" class="g pqb" onclick="PVT.dForm('${d.id}')">${I('pencil')}Edit</button><button type="button" class="g pqb" style="color:var(--bad)" onclick="PVT.dDel('${d.id}')">${I('trash')}Delete</button><button type="button" class="g pqb" onclick="PVT.cl()">${I('x')}Close</button></div>`);
- try{let h='';for(let i=0;i<d.pg.length;i++){const g=d.pg[i],u=await getF(g.id),b=new Blob([u],{type:g.ty}),url=URL.createObjectURL(b);urls.push(url);
-  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default;flex-wrap:wrap"><span class="pqb">${I('file')}PDF page ${i+1}${g.en?' '+I('lock','s'):''}</span><button type="button" class="g pqb pqs" onclick="PVT.pgOut('${d.id}',${i})">${I('share')}Share / Save</button>${g.en?`<div style="width:100%"><input type="password" id="pv_vp${i}" placeholder="PDF password" autocomplete="off" style="margin:6px 0"><button type="button" class="pqb" onclick="PVT.unSaved('${d.id}',${i})">${I('unlock')}Remove password</button> <span id="pv_vm${i}" class="mu"></span></div>`:''}</div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
-  const v=Q('#pv_vw');if(v)v.innerHTML=h}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Could not open: '+E(x.message||x)+'</p>'}}
+ try{let h='';const pp=[];for(let i=0;i<d.pg.length;i++){const g=d.pg[i],u=await getF(g.id),b=new Blob([u],{type:g.ty}),url=URL.createObjectURL(b);urls.push(url);
+  if(g.ty=='application/pdf'&&!g.en)pp.push([i,u]);
+  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default;flex-wrap:wrap"><span class="pqb">${I('file')}PDF page ${i+1}${g.en?' '+I('lock','s'):''}</span><button type="button" class="g pqb pqs" onclick="PVT.pgOut('${d.id}',${i})">${I('share')}Share / Save</button>${g.en?`<div style="width:100%"><input type="password" id="pv_vp${i}" placeholder="PDF password" autocomplete="off" style="margin:6px 0"><button type="button" class="pqb" onclick="PVT.unSaved('${d.id}',${i})">${I('unlock')}Remove password</button> <span id="pv_vm${i}" class="mu"></span></div>`:`<div class="pqpp" id="pv_pp${i}"><p class="mu" style="text-align:center">Loading preview…</p></div>`}</div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
+  const v=Q('#pv_vw');if(v)v.innerHTML=h;const tk=++curTok;(async()=>{for(const[i,u]of pp){if(tk!==curTok)return;await prevPdf(u,i,tk)}})()}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Could not open: '+E(x.message||x)+'</p>'}}
+function zoomPdf(items,k){pvOpen(items,k,'plain');const o=document.querySelector('.pv'),d=Q('#pvd');if(o&&d&&d.open)d.appendChild(o)}
+async function prevPdf(u8,i,tk){
+ try{await PJL();const doc=await pdfjsLib.getDocument({data:u8.slice()}).promise;pdocs.push(doc);
+  const n=doc.numPages,m=Math.min(n,10),items=Array.from({length:n},(_,k)=>({d:doc,i:k+1}));let first=1;
+  for(let k=1;k<=m;k++){if(tk!==curTok||!Q('#pv_pp'+i))return;
+   const pg=await doc.getPage(k),v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(2.5,900/v0.width)}),c=document.createElement('canvas');
+   c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);c.className='pqpc';c.setAttribute('role','button');c.setAttribute('aria-label','Zoom page '+k);
+   await pg.render({canvasContext:c.getContext('2d'),viewport:v}).promise;
+   const b=Q('#pv_pp'+i);if(tk!==curTok||!b)return;
+   if(first){b.innerHTML='<p class="mu" style="text-align:center;margin:0 0 6px">Tap a page to zoom</p>';first=0}
+   c.onclick=()=>zoomPdf(items,k-1);b.appendChild(c)}
+  const b=Q('#pv_pp'+i);if(b&&n>m)b.insertAdjacentHTML('beforeend','<p class="mu" style="text-align:center">Showing '+m+' of '+n+' pages. Tap a page to see all.</p>')}
+ catch(x){const b=Q('#pv_pp'+i);if(b)b.innerHTML='<p class="w">Preview not available: '+E(x&&x.message||x)+'</p>'}}
 const PJL=async()=>{await lib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'};
 async function rasterPdf(u8,pw,say){await PJL();let doc;
  try{doc=await pdfjsLib.getDocument({data:u8,password:pw}).promise}catch(x){throw new Error(x&&x.name=='PasswordException'?'Wrong password':'The PDF could not be opened')}
