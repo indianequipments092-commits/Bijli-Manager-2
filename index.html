@@ -2641,7 +2641,8 @@ function mainV(){
  return(soon.length?`<section class="card"><h3>⏰ Expiry paas</h3>${soon.map(d=>`<div class="mu">${E(d.n)} (${E((M.persons.find(p=>p.id==d.pid)||{}).n||'-')})${expTag(d.exp)}</div>`).join('')}</section>`:'')+
  `<section class="card"><h3>Person</h3><div class="row" style="margin:0"><button class="${st.pid?'g':''}" onclick="PVT.pick('')">Sab (${M.docs.length})</button>${M.persons.map(p=>`<button class="${st.pid==p.id?'':'g'}" onclick="PVT.pick('${p.id}')">${E(p.n)} (${c[p.id]||0})</button>`).join('')}<button class="g" onclick="PVT.pForm()">+ Person</button></div>${sp?`<div class="row"><button class="g" onclick="PVT.pForm('${sp.id}')">Naam badlo</button><button class="g" style="color:var(--bad)" onclick="PVT.pDel('${sp.id}')">${E(sp.n)} delete</button></div>`:''}</section>
 <section class="card"><input type="search" placeholder="Naam ya category se dhundo" value="${E(st.q)}" oninput="PVT.search(this.value)"><div class="row"><button onclick="PVT.dForm()">+ Document</button><button id="pv_ex" onclick="PVT.exDlg()">Export PDF (${st.sel.size})</button><button class="g" onclick="PVT.selAll()">Sab select</button><button class="g" onclick="PVT.selNone()">Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
-<section class="card"><h3>Backup</h3><p class="mu">Backup PIN se encrypted hota hai. ZIP bade data ke liye (file .pvz), JSON chhote data ke liye. Restore me file khud pehchani jati hai.</p><div class="row"><button onclick="PVT.bkZip()">ZIP backup</button><button class="g" onclick="PVT.bkJson()">JSON backup</button><button class="g" onclick="document.getElementById('pv_rf').click()">Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)"></section>`}
+<section class="card"><h3>Backup</h3><p class="mu">Backup PIN se encrypted hota hai. ZIP bade data ke liye (file .pvz), JSON chhote data ke liye. Restore me file khud pehchani jati hai.</p><div class="row"><button onclick="PVT.bkZip()">ZIP backup</button><button class="g" onclick="PVT.bkJson()">JSON backup</button><button class="g" onclick="document.getElementById('pv_rf').click()">Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)">
+<h3 style="margin-top:16px">Cloud backup (Supabase)</h3><p class="mu">Encrypted .pvz file aapke login ke private folder me jati hai. Bijli ke Settings me Cloud sync se login hona chahiye. Sirf aap dabao tab upload hota hai.</p><div class="row"><button onclick="PVT.cloudUp()">☁️ Cloud backup</button><button class="g" onclick="PVT.cloudDown()">Cloud restore</button></div><p id="pv_cs" class="mu"></p><p id="pv_cl" class="mu">${(()=>{try{const w=localStorage.getItem(CBK);return w?'Aakhri cloud backup: '+E(w):''}catch(x){return''}})()}</p></section>`}
 function refresh(){const l=Q('#pv_list');if(l)l.innerHTML=rows();const b=Q('#pv_ex');if(b)b.textContent='Export PDF ('+st.sel.size+')'}
 const pick=id=>{st.pid=id;go()};
 const search=v=>{st.q=v;refresh()};
@@ -2774,9 +2775,23 @@ function save(){if(!LAST)return;const a=document.createElement('a');a.href=URL.c
 
 /* ---- backup ---- */
 const manifest=()=>({v:1,persons:M.persons,cats:M.cats,docs:M.docs});
-async function bkZip(){try{await JZL();const z=new JSZip();z.file('data.json',JSON.stringify(manifest()));for(const d of M.docs)for(const g of d.pg)z.file('files/'+g.id,await getF(g.id));
- const u=await z.generateAsync({type:'uint8array',compression:'STORE'}),c=await seal(KEY,u),salt=s2b(meta().s),o=new Uint8Array(32+c.ct.length);o.set([80,86,84,49],0);o.set(salt,4);o.set(c.iv,20);o.set(c.ct,32);
- bkDone('PvtDocs-'+fdate()+'.pvz',new Blob([o],{type:'application/octet-stream'}))}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
+async function mkZip(){await JZL();const z=new JSZip();z.file('data.json',JSON.stringify(manifest()));for(const d of M.docs)for(const g of d.pg)z.file('files/'+g.id,await getF(g.id));
+ const u=await z.generateAsync({type:'uint8array',compression:'STORE'}),c=await seal(KEY,u),salt=s2b(meta().s),o=new Uint8Array(32+c.ct.length);o.set([80,86,84,49],0);o.set(salt,4);o.set(c.iv,20);o.set(c.ct,32);return new Blob([o],{type:'application/octet-stream'})}
+async function bkZip(){try{bkDone('PvtDocs-'+fdate()+'.pvz',await mkZip())}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
+const CBK='bijli_pvt_cb';
+async function cloudUp(){const b=Q('#pv_cs');const say=t=>{if(b)b.textContent=t};
+ try{say('Backup ban raha hai…');const blob=await mkZip();if(blob.size>52428800)throw new Error('Backup '+MB(blob.size)+' ka hai, cloud limit 50 MB hai. Phone me ZIP backup save karo.');
+  const t=await CLD.tok();say('Upload ho raha hai… '+MB(blob.size));
+  const r=await fetch(t.url+'/storage/v1/object/pvt-docs/'+t.uid+'/latest.pvz',{method:'POST',headers:{apikey:t.key,Authorization:'Bearer '+t.at,'x-upsert':'true','Content-Type':'application/octet-stream'},body:blob});
+  if(!r.ok){let j=null;try{j=await r.json()}catch(x){}throw new Error((j&&(j.message||j.error))||'HTTP '+r.status)}
+  const w=new Date().toLocaleString('en-IN');try{localStorage.setItem(CBK,w)}catch(x){}say('Cloud me save ho gaya ✓ '+w);const l=Q('#pv_cl');if(l)l.textContent='Aakhri cloud backup: '+w}
+ catch(x){say('Cloud backup nahi hua: '+(x.message||x))}}
+async function cloudDown(){const b=Q('#pv_cs');const say=t=>{if(b)b.textContent=t};
+ try{say('Cloud se la raha hai…');const t=await CLD.tok();
+  const r=await fetch(t.url+'/storage/v1/object/authenticated/pvt-docs/'+t.uid+'/latest.pvz',{headers:{apikey:t.key,Authorization:'Bearer '+t.at}});
+  if(r.status==400||r.status==404)throw new Error('Cloud me abhi koi backup nahi hai');if(!r.ok)throw new Error('HTTP '+r.status);
+  const u=new Uint8Array(await r.arrayBuffer());say('');restBytes(u,'Cloud backup')}
+ catch(x){say('Cloud restore nahi hua: '+(x.message||x))}}
 async function bkJson(){try{const tot=M.docs.reduce((a,d)=>a+d.pg.reduce((b,g)=>b+g.sz,0),0);if(tot*1.4>50e6&&!confirm('JSON backup lagbhag '+MB(tot*1.4)+' ka hoga aur phone me hang ho sakta hai. ZIP behtar hai. Phir bhi JSON banayein?'))return;
  const files={};for(const d of M.docs)for(const g of d.pg)files[g.id]=b2s(await getF(g.id));
  const m=manifest();m.files=files;const c=await seal(KEY,enc.encode(JSON.stringify(m)));
@@ -2784,12 +2799,13 @@ async function bkJson(){try{const tot=M.docs.reduce((a,d)=>a+d.pg.reduce((b,g)=>
 function bkDone(name,blob){LAST={name,blob};dg(`<h3>Backup ready</h3><p class="mu">${E(name)} · ${MB(blob.size)}</p><p class="mu">Ise Drive ya WhatsApp me save kar lo. Restore ke waqt yahi PIN chahiye.</p><div class="row"><button type="button" onclick="PVT.send()">Share / Save</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
 
 /* ---- restore ---- */
-async function restPick(inp){const fl=inp.files&&inp.files[0];inp.value='';if(!fl)return;
- try{const u=new Uint8Array(await fl.arrayBuffer());
+async function restPick(inp){const fl=inp.files&&inp.files[0];inp.value='';if(!fl)return;let u;try{u=new Uint8Array(await fl.arrayBuffer())}catch(x){alert('File padh nahi paya');return}restBytes(u,fl.name)}
+function restBytes(u,nm){
+ try{
   if(u.length>48&&u[0]==80&&u[1]==86&&u[2]==84&&u[3]==49)RS={kind:'zip',salt:u.slice(4,20),iv:u.slice(20,32),ct:u.slice(32)};
   else{const o=JSON.parse(dec.decode(u));if(!o||o.pvt!==1)throw 0;RS={kind:'json',salt:s2b(o.s),iv:s2b(o.i),ct:s2b(o.c)}}}
  catch(x){RS=null;alert('Ye Pvt Documents ki backup file nahi lagti');return}
- dg(`<h3>Restore</h3><p class="mu">${E(fl.name)} (${RS.kind=='zip'?'ZIP':'JSON'} backup)</p><label>Backup ke waqt wala PIN<input id="pv_rp" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label>${KEY?`<label>Kaise<select id="pv_rm"><option value="merge">Merge (naye jud jayenge, purane waise hi)</option><option value="replace">Replace (sab kuch backup wala ho jayega)</option></select></label>`:''}<p id="pv_re" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_rb" onclick="PVT.restRun()">Restore</button></div>`)}
+ dg(`<h3>Restore</h3><p class="mu">${E(nm)} (${RS.kind=='zip'?'ZIP':'JSON'} backup)</p><label>Backup ke waqt wala PIN<input id="pv_rp" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label>${KEY?`<label>Kaise<select id="pv_rm"><option value="merge">Merge (naye jud jayenge, purane waise hi)</option><option value="replace">Replace (sab kuch backup wala ho jayega)</option></select></label>`:''}<p id="pv_re" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_rb" onclick="PVT.restRun()">Restore</button></div>`)}
 async function restRun(){
  const er=Q('#pv_re'),b=Q('#pv_rb'),pin=Q('#pv_rp').value,mode=Q('#pv_rm')?Q('#pv_rm').value:'replace';
  if(!/^\d{4,10}$/.test(pin)){er.textContent='PIN daalo';return}
@@ -2824,7 +2840,7 @@ async function restRun(){
   dg(`<h3>Restore ho gaya ✓</h3><p>${added} document jude${dup?', '+dup+' duplicate chhode':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">Theek hai</button></div>`);go()}
  catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore beech me ruk gaya: '+(x.message||x)}}
 
-return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,restPick,restRun,cl}
+return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,restPick,restRun,cl}
 })();
 </script><script>/* ===== Cloud sync (Supabase) : login + auto save/load, local-first. Token/session backup me nahi jata ===== */
 window.CLD=(()=>{
@@ -2928,7 +2944,8 @@ function card(){
 function setAuto(v){ss.auto=!!v;persist()}
 
 setTimeout(startup,2500);setInterval(tick,15000);
-return{card,auth,copyKey,logout,push,pull,overwrite,setAuto,tick,startup}
+async function tok(){if(!ss)throw new Error('Pehle Settings me Cloud sync se login karo');await fresh();let uid='';try{uid=JSON.parse(atob(ss.at.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub}catch(x){}if(!uid)throw new Error('Dobara login karo');return{url:CFG.url,key:CFG.key,at:ss.at,uid}}
+return{card,auth,copyKey,logout,push,pull,overwrite,setAuto,tick,startup,tok}
 })();
 </script><script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script><style>.cbw{overflow:hidden;border-radius:10px;background:#8883;padding:18px;touch-action:none;margin-top:8px}
 .cbi{position:relative;width:fit-content;max-width:100%;margin:0 auto;line-height:0}
