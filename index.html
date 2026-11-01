@@ -2700,9 +2700,10 @@ function dForm(id){
  plist()}
 function plist(){const l=Q('#pv_pl');if(!l||!PD)return;
  const old=PD.old.filter(g=>!PD.rem.has(g.id)).map((g,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${g.ty=='application/pdf'?'📄':'🖼'} Page ${i+1} <span class="mu">(saved, ${MB(g.sz)})</span></span><button type="button" class="g" onclick="PVT.rmOld('${g.id}')">✕</button></div>`).join('');
- const nw=PD.pend.map((p,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${p.f.type=='application/pdf'?'📄':'🖼'} ${E(p.f.name||'photo')} <span class="mu">(${MB(p.f.size)})</span></span><span><button type="button" class="g" onclick="PVT.mvP(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.mvP(${i},1)">▼</button> <button type="button" class="g" onclick="PVT.rmP(${i})">✕</button></span></div>`).join('');
+ const nw=PD.pend.map((p,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${p.f.type=='application/pdf'?'📄':'🖼'} ${E(p.f.name||'photo')} <span class="mu">(${MB(p.f.size)})</span>${p.en?`<br><span class="w">🔒 Password wali PDF</span><br><input type="password" id="pv_pw${i}" placeholder="PDF ka password" autocomplete="off" style="margin:6px 0"><button type="button" onclick="PVT.unPdf(${i})">Password hatao</button> <span id="pv_pm${i}" class="mu"></span>`:''}</span><span><button type="button" class="g" onclick="PVT.mvP(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.mvP(${i},1)">▼</button> <button type="button" class="g" onclick="PVT.rmP(${i})">✕</button></span></div>`).join('');
  l.innerHTML=old+nw||'<p class="mu">Abhi koi page add nahi hua</p>'}
-function addF(i){const a=[...i.files];i.value='';a.forEach(f=>{if(f.type=='application/pdf'||/^image\//.test(f.type)||/\.pdf$/i.test(f.name))PD.pend.push({f})});plist()}
+const encPdf=async f=>{try{const t=new TextDecoder('latin1').decode(new Uint8Array(await f.arrayBuffer()));return /\/Encrypt\s*(<<|\d+\s+\d+\s+R)/.test(t)}catch(x){return false}};
+function addF(i){const a=[...i.files];i.value='';a.forEach(f=>{if(f.type=='application/pdf'||/^image\//.test(f.type)||/\.pdf$/i.test(f.name)){const p={f};PD.pend.push(p);if(f.type=='application/pdf'||/\.pdf$/i.test(f.name))encPdf(f).then(e=>{if(e){p.en=1;plist()}})}});plist()}
 const rmP=i=>{PD.pend.splice(i,1);plist()},rmOld=id=>{PD.rem.add(id);plist()};
 const mvP=(i,n)=>{const j=i+n;if(j<0||j>=PD.pend.length)return;[PD.pend[i],PD.pend[j]]=[PD.pend[j],PD.pend[i]];plist()};
 function loadImg(blob){return new Promise((ok,no)=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('Ye photo khul nahi paayi (format support nahi)'))};i.src=u})}
@@ -2717,7 +2718,7 @@ async function dSave(){
  if(!n){er.textContent='Document ka naam likho';return}
  const keep=PD.old.filter(g=>!PD.rem.has(g.id));if(!keep.length&&!PD.pend.length){er.textContent='Kam se kam ek page add karo';return}
  const b=Q('#pv_ds');b.disabled=true;const added=[];
- try{for(let i=0;i<PD.pend.length;i++){er.textContent='Save ho raha hai… '+(i+1)+'/'+PD.pend.length;const r=await prep(PD.pend[i].f,sm),id=uid()+i;await putF(id,r.u8);added.push({id,ty:r.ty,sz:r.u8.length})}
+ try{for(let i=0;i<PD.pend.length;i++){er.textContent='Save ho raha hai… '+(i+1)+'/'+PD.pend.length;const r=await prep(PD.pend[i].f,sm),id=uid()+i;await putF(id,r.u8);const pgm={id,ty:r.ty,sz:r.u8.length};if(r.ty=='application/pdf'&&(PD.pend[i].en||await encPdf(PD.pend[i].f)))pgm.en=1;added.push(pgm)}
   er.textContent='';
   let d=PD.id?M.docs.find(x=>x.id==PD.id):null;
   if(!d){d={id:uid(),t:Date.now()};M.docs.push(d)}
@@ -2731,14 +2732,43 @@ async function dSave(){
 async function show(id){const d=M.docs.find(x=>x.id==id);if(!d)return;const p=M.persons.find(x=>x.id==d.pid);
  dg(`<h3>${E(d.n)}</h3><p class="mu">${E(p?p.n:'-')} · ${E(d.cat)}${expTag(d.exp)}</p>${d.note?`<p>${E(d.note)}</p>`:''}<div id="pv_vw"><p class="mu">Khul raha hai…</p></div><div class="row"><button type="button" onclick="PVT.exDlg(['${d.id}'])">PDF</button><button type="button" class="g" onclick="PVT.dForm('${d.id}')">Edit</button><button type="button" class="g" style="color:var(--bad)" onclick="PVT.dDel('${d.id}')">Delete</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`);
  try{let h='';for(let i=0;i<d.pg.length;i++){const g=d.pg[i],u=await getF(g.id),b=new Blob([u],{type:g.ty}),url=URL.createObjectURL(b);urls.push(url);
-  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default"><span>📄 PDF page ${i+1}</span><button type="button" class="g" onclick="PVT.pgOut('${d.id}',${i})">Share / Save</button></div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
+  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default;flex-wrap:wrap"><span>📄 PDF page ${i+1}${g.en?' 🔒':''}</span><button type="button" class="g" onclick="PVT.pgOut('${d.id}',${i})">Share / Save</button>${g.en?`<div style="width:100%"><input type="password" id="pv_vp${i}" placeholder="PDF ka password" autocomplete="off" style="margin:6px 0"><button type="button" onclick="PVT.unSaved('${d.id}',${i})">Password hatao</button> <span id="pv_vm${i}" class="mu"></span></div>`:''}</div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
   const v=Q('#pv_vw');if(v)v.innerHTML=h}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Khul nahi paya: '+E(x.message||x)+'</p>'}}
+const PJL=async()=>{await lib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'};
+async function rasterPdf(u8,pw,say){await PJL();let doc;
+ try{doc=await pdfjsLib.getDocument({data:u8,password:pw}).promise}catch(x){throw new Error(x&&x.name=='PasswordException'?'Galat password':'PDF khul nahi paayi')}
+ const n=Math.min(doc.numPages,80),out=[];
+ for(let k=1;k<=n;k++){say('Password hat raha hai… '+k+'/'+n);const pg=await doc.getPage(k),v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(3,2000/Math.max(v0.width,v0.height))}),c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:x,viewport:v}).promise;out.push(await new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Page convert nahi hua')),'image/jpeg',.85)));c.width=c.height=0}
+ return out}
+let QT=null;
+async function qpdfLoad(){if(QT)return QT;const B='https://cdn.jsdelivr.net/npm/pdfstudio@0.4.0/';
+ const mod=await import(B+'+esm');let wu=null;
+ for(const p of ['dist/qpdf.wasm','qpdf.wasm','dist/wasm/qpdf.wasm','src/wasm/qpdf.wasm']){try{const r=await fetch(B+p,{method:'HEAD'});if(r.ok){wu=B+p;break}}catch(x){}}
+ const pdf=await mod.createPdfToolkit(wu?{wasmUrl:wu}:undefined);QT={pdf,Err:mod.PdfPasswordError};return QT}
+async function unlockText(u8,pw){let q;try{q=await qpdfLoad()}catch(x){const e=new Error('NOQ');e.noq=1;throw e}
+ try{return await q.pdf.unlock(u8,{password:pw})}catch(x){if((q.Err&&x instanceof q.Err)||(x&&x.name==='PdfPasswordError')||/password/i.test(String(x&&x.message)))throw new Error('Galat password');const e=new Error('NOQ');e.noq=1;throw e}}
+async function unPdf(i,photo){const p=PD&&PD.pend[i],inp=Q('#pv_pw'+i),say=t=>{const e=Q('#pv_pm'+i);if(e)e.textContent=t};if(!p||!inp)return;
+ if(!inp.value){say('Password daalo');return}say('Khul raha hai…');
+ try{const raw=new Uint8Array(await p.f.arrayBuffer()),nm=(p.f.name||'file').replace(/\.pdf$/i,'');
+  if(photo){const bl=await rasterPdf(raw,inp.value,say);PD.pend.splice(i,1,...bl.map((b,k)=>({f:new File([b],nm+' - page '+(k+1)+'.jpg',{type:'image/jpeg'})})));plist();return}
+  const u=await unlockText(raw,inp.value);PD.pend.splice(i,1,{f:new File([u],nm+'.pdf',{type:'application/pdf'}),un:1});plist()}
+ catch(x){if(x&&x.noq){const e=Q('#pv_pm'+i);if(e)e.innerHTML='Text wala unlock load nahi hua (net check karo). <button type="button" class="g" onclick="PVT.unPdf('+i+',1)">Photo ki tarah convert karo</button>'}else say(x.message||String(x))}}
+async function unSaved(id,i,photo){const d=M.docs.find(x=>x.id==id),g=d&&d.pg[i],inp=Q('#pv_vp'+i),say=t=>{const e=Q('#pv_vm'+i);if(e)e.textContent=t};if(!g||!inp)return;
+ if(!inp.value){say('Password daalo');return}say('Khul raha hai…');const added=[];
+ try{const raw=await getF(g.id);let outs;
+  if(photo){outs=(await rasterPdf(raw,inp.value,say)).map(b=>({b,ty:'image/jpeg'}))}
+  else{const u=await unlockText(raw,inp.value);outs=[{b:new Blob([u]),ty:'application/pdf'}]}
+  for(let k=0;k<outs.length;k++){const u=new Uint8Array(await outs[k].b.arrayBuffer()),nid=uid()+k;await putF(nid,u);added.push({id:nid,ty:outs[k].ty,sz:u.length})}
+  d.pg.splice(i,1,...added);await saveM();try{await idel('blob',g.id)}catch(x){}show(id)}
+ catch(x){for(const a of added){try{await idel('blob',a.id)}catch(y){}}
+  if(x&&x.noq){const e=Q('#pv_vm'+i);if(e)e.innerHTML='Text wala unlock load nahi hua (net check karo). <button type="button" class="g" onclick="PVT.unSaved(\''+id+'\','+i+',1)">Photo ki tarah convert karo</button>'}else say(x.message||String(x))}}
 async function pgOut(id,i){const d=M.docs.find(x=>x.id==id),g=d.pg[i];try{const u=await getF(g.id);LAST={name:fsn(d.n)+(g.ty=='application/pdf'?'.pdf':g.ty=='image/png'?'.png':'.jpg'),blob:new Blob([u],{type:g.ty})};await send()}catch(x){alert(x.message||x)}}
 async function dDel(id){const d=M.docs.find(x=>x.id==id);if(!d||!confirm(d.n+' delete karna hai?'))return;
  try{for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(x=>x.id!=id);st.sel.delete(id);await saveM();cl();go()}catch(x){alert('Delete nahi hua: '+(x.message||x))}}
 
 /* ---- export PDF ---- */
 const fsn=s=>String(s).replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim()||'file';
+const uq=(n,used)=>{let k=n,i=2;const m=/\.[^.]*$/.exec(n),ex=m&&m.index>0?m[0]:'',b=ex?n.slice(0,-ex.length):n;while(used.has(k.toLowerCase()))k=b+' ('+(i++)+')'+ex;used.add(k.toLowerCase());return k};
 const fdate=()=>{const d=new Date(),M_=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(d.getDate()).padStart(2,'0')+M_[d.getMonth()]+d.getFullYear()};
 function exDlg(ids){
  exs=(ids||[...st.sel]).filter(id=>M.docs.some(d=>d.id==id));
@@ -2756,15 +2786,20 @@ async function exRun(){
  try{await PLL();const P=PDFLib.PDFDocument,W=595.28,H=841.89,G=28,docs=exs.map(id=>M.docs.find(x=>x.id==id)).filter(Boolean);
   const fit=(pg,im,x,y,w,h)=>{const s=Math.min(w/im.width,h/im.height),iw=im.width*s,ih=im.height*s;pg.drawImage(im,{x:x+(w-iw)/2,y:y+(h-ih)/2,width:iw,height:ih})};
   const emb=async(pdf,g)=>{let u=await getF(g.id);if(ql!='o'){const b=await jpegOf(new Blob([u],{type:g.ty}),ql=='m'?1600:1100,ql=='m'?.78:.6);u=new Uint8Array(await b.arrayBuffer());return pdf.embedJpg(u)}return g.ty=='image/png'?pdf.embedPng(u):pdf.embedJpg(u)};
-  let done=0;const total=docs.reduce((a,d)=>a+d.pg.length,0);
+  const extras=[];let done=0;const total=docs.reduce((a,d)=>a+d.pg.length,0);
   const addDoc=async(pdf,d)=>{const all=d.pg.length==2&&d.pg.every(g=>g.ty!='application/pdf');
    if(two&&all){const a=await emb(pdf,d.pg[0]),c=await emb(pdf,d.pg[1]),pg=pdf.addPage([W,H]),h=H/2-G-8;fit(pg,a,G,H/2+8,W-2*G,h);fit(pg,c,G,G,W-2*G,h);done+=2;er.textContent='PDF ban rahi hai… '+done+'/'+total;return}
-   for(const g of d.pg){if(g.ty=='application/pdf'){const src=await P.load(await getF(g.id),{ignoreEncryption:true}),cp=await pdf.copyPages(src,src.getPageIndices());cp.forEach(x=>pdf.addPage(x))}
+   for(let gi=0;gi<d.pg.length;gi++){const g=d.pg[gi];if(g.ty=='application/pdf'){const raw=await getF(g.id);let ok=!g.en;if(ok){try{const src=await P.load(raw),cp=await pdf.copyPages(src,src.getPageIndices());cp.forEach(x=>pdf.addPage(x))}catch(x){ok=false}}if(!ok)extras.push({name:fsn(d0(d))+' - page '+(gi+1)+'.pdf',u:raw})}
     else{const im=await emb(pdf,g),pg=pdf.addPage([W,H]);fit(pg,im,G,G,W-2*G,H-2*G)}done++;er.textContent='PDF ban rahi hai… '+done+'/'+total}};
-  if(mode=='one'||docs.length==1){const pdf=await P.create();for(const d of docs)await addDoc(pdf,d);const u=await pdf.save();LAST={name:(docs.length==1?fsn(d0(docs[0])):'PvtDocs-'+fdate())+'.pdf',blob:new Blob([u],{type:'application/pdf'})}}
-  else{await JZL();const z=new JSZip(),used=new Set();for(const d of docs){const pdf=await P.create();await addDoc(pdf,d);let n=fsn(d0(d)),k=n,i=2;while(used.has(k.toLowerCase()))k=n+' ('+i++ +')';used.add(k.toLowerCase());z.file(k+'.pdf',await pdf.save())}
+  const nm=n=>fsn(n);
+  if(mode=='one'||docs.length==1){const pdf=await P.create();for(const d of docs)await addDoc(pdf,d);const u=await pdf.save();
+   if(extras.length){await JZL();const z=new JSZip(),used=new Set();if(pdf.getPageCount()>0)z.file(uq(nm(docs.length==1?d0(docs[0]):'PvtDocs-'+fdate())+'.pdf',used),u);extras.forEach(x=>z.file(uq(x.name,used),x.u));LAST={name:'PvtDocs-'+fdate()+'.zip',blob:await z.generateAsync({type:'blob',compression:'STORE'})}}
+   else LAST={name:(docs.length==1?nm(d0(docs[0])):'PvtDocs-'+fdate())+'.pdf',blob:new Blob([u],{type:'application/pdf'})}}
+  else{await JZL();const z=new JSZip(),used=new Set();for(const d of docs){const pdf=await P.create();await addDoc(pdf,d);if(pdf.getPageCount()>0)z.file(uq(nm(d0(d))+'.pdf',used),await pdf.save())}
+   extras.forEach(x=>z.file(uq(x.name,used),x.u));
    LAST={name:'PvtDocs-'+fdate()+'.zip',blob:await z.generateAsync({type:'blob',compression:'STORE'})}}
-  dg(`<h3>PDF ready</h3><p class="mu">${E(LAST.name)} · ${MB(LAST.blob.size)}</p><div class="row"><button type="button" onclick="PVT.send()">Share</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
+  const exN=extras.length;
+  dg(`<h3>PDF ready</h3><p class="mu">${E(LAST.name)} · ${MB(LAST.blob.size)}</p>${exN?`<p class="w">${exN} password wali PDF merge nahi hui, uski original file ZIP me alag hai.</p>`:''}<div class="row"><button type="button" onclick="PVT.send()">Share</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
  catch(x){b.disabled=false;er.textContent='PDF nahi bani: '+(x.message||x)}}
 const d0=d=>{const p=M.persons.find(x=>x.id==d.pid);return(p?p.n+' - ':'')+d.n};
 
@@ -2828,7 +2863,7 @@ async function restRun(){
   (man.cats||[]).forEach(c=>{if(typeof c=='string'&&!tgt.cats.includes(c)&&!CATS.includes(c))tgt.cats.push(c)});
   let i=0;const newIds=new Set();
   for(const d of man.docs){i++;er.textContent='Restore ho raha hai… '+i+'/'+man.docs.length;
-   const nd={id:d.id,pid:pm[d.pid]||tgt.persons[0]&&tgt.persons[0].id||'',cat:String(d.cat||'Other'),n:d.n,note:String(d.note||''),exp:String(d.exp||''),t:+d.t||Date.now(),pg:d.pg.map(g=>({id:g.id,ty:g.ty,sz:+g.sz||0}))};
+   const nd={id:d.id,pid:pm[d.pid]||tgt.persons[0]&&tgt.persons[0].id||'',cat:String(d.cat||'Other'),n:d.n,note:String(d.note||''),exp:String(d.exp||''),t:+d.t||Date.now(),pg:d.pg.map(g=>g.en?{id:g.id,ty:g.ty,sz:+g.sz||0,en:1}:{id:g.id,ty:g.ty,sz:+g.sz||0})};
    if(!nd.pid){const p={id:uid(),n:'Other'};tgt.persons.push(p);nd.pid=p.id}
    if(ids.has(nd.id)||fps.has(fp(nd))){dup++;continue}
    for(const g of nd.pg){const u=await getB(g.id);g.sz=u.length;await putF(g.id,u);newIds.add(g.id)}
@@ -2840,7 +2875,7 @@ async function restRun(){
   dg(`<h3>Restore ho gaya ✓</h3><p>${added} document jude${dup?', '+dup+' duplicate chhode':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">Theek hai</button></div>`);go()}
  catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore beech me ruk gaya: '+(x.message||x)}}
 
-return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,restPick,restRun,cl}
+return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,unPdf,unSaved,restPick,restRun,cl}
 })();
 </script><script>/* ===== Cloud sync (Supabase) : login + auto save/load, local-first. Token/session backup me nahi jata ===== */
 window.CLD=(()=>{
