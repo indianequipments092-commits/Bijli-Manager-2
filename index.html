@@ -997,7 +997,8 @@ const out=[H.concat(src?['Source file','Sheet']:[])];
 parts.forEach((p,pi)=>{const mp=H.map(k=>hp[pi].indexOf(k));p.rows.slice(1).forEach(r=>{const row=mp.map(ix=>ix<0||r[ix]==null?'':r[ix]);if(src)row.push(p.file,p.name);out.push(row)})});
 const t=$('#dm_o').value;showOut([{name:'merged.'+t,blob:t=='csv'?cBlob(out):xBlob(xBook([{name:'Merged',rows:out}])),note:(out.length-1)+' rows · '+H.length+' columns'}])});
 
-/* ---- Duplicate remove ---- */let DD=null;
+/* ---- Duplicate remove ---- */
+let DD=null;
 async function ddLoad(){const fl=$('#f').files[0];DD=null;$('#dd_b').style.display='none';if(!fl)return;try{DD={name:fl.name,sh:await dRead(fl)}}catch(x){return alert(x.message)}
 $('#dd_s').innerHTML=DD.sh.map((s,i)=>`<option value="${i}">${e(s.name)} (${rn(s.rows)})</option>`).join('');$('#dd_b').style.display='block';ddCols()}
 function ddCols(){const s=DD.sh[+$('#dd_s').value],H=hdrs(s.rows);$('#dd_c').innerHTML=H.length?H.map((h,i)=>`<label style="display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:14px;color:var(--tx)"><input type="checkbox" id="dd_k${i}" checked style="width:auto;margin:0"> ${e(h)}</label>`).join(''):'<p class="mu">No data in this sheet.</p>'}
@@ -1996,7 +1997,8 @@ async function cmPix(pa,pb){const ca=await pRender(pa,.8),b0=await pRender(pb,.8
  const A=ca.getContext('2d').getImageData(0,0,ca.width,ca.height),B=x.getImageData(0,0,cb.width,cb.height),N=A.data.length;let d=0;
  for(let i=0;i<N;i+=4){const df=Math.max(Math.abs(A.data[i]-B.data[i]),Math.abs(A.data[i+1]-B.data[i+1]),Math.abs(A.data[i+2]-B.data[i+2]));if(df>48){d++;B.data[i]=255;B.data[i+1]=0;B.data[i+2]=0}}
  x.putImageData(B,0,0);ca.width=ca.height=0;b0.width=b0.height=0;return{pct:d*400/N,c:cb}}
-window.cmRun=()=>run(async()=>{const fa=$('#f').files[0],fb=$('#cm_b').files[0];if(!fa||!fb)throw new Error('Dono PDF chuno');const dt=$('#cm_t').checked,dp=$('#cm_p').checked;if(!dt&&!dp)throw new Error('Kam se kam ek tareeka chuno'); const A=await pOpen(await pdfBytes(fa)),B=await pOpen(await pdfBytes(fb)),n=Math.min(A.numPages,B.numPages,40),rep=[],vis=[];let ch=0;
+window.cmRun=()=>run(async()=>{const fa=$('#f').files[0],fb=$('#cm_b').files[0];if(!fa||!fb)throw new Error('Dono PDF chuno');const dt=$('#cm_t').checked,dp=$('#cm_p').checked;if(!dt&&!dp)throw new Error('Kam se kam ek tareeka chuno');
+ const A=await pOpen(await pdfBytes(fa)),B=await pOpen(await pdfBytes(fb)),n=Math.min(A.numPages,B.numPages,40),rep=[],vis=[];let ch=0;
  for(let i=1;i<=n;i++){a9Busy('Page '+i+' / '+n+' compare ho raha hai…');await paint();const pa=await A.getPage(i),pb=await B.getPage(i);let ad=0,rm=0,ls=[],pc=0;
   if(dt){const d=cmDiff(await cmLines(pa),await cmLines(pb));d.forEach(x=>x[0]=='+'?ad++:rm++);ls=d.slice(0,30)}
   if(dp){const r=await cmPix(pa,pb);pc=r.pct;if(pc>.5&&vis.length<4)vis.push({i,c:r.c});else r.c.width=r.c.height=0}
@@ -2728,6 +2730,16 @@ return{card,auth,copyKey,logout,push,pull,overwrite,setAuto,tick,startup}
 .pvv{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 6px;align-items:center}.pvg{display:inline-flex;gap:6px}.pvg .on{outline:2px solid #2f9e44;background:#2f9e4433}
 .pvtx{position:absolute;left:0;right:0;bottom:0;height:42%;z-index:4;background:#111e;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));flex-direction:column;gap:6px}
 .pvtx textarea{flex:1;width:100%;background:#000a;color:#fff;border:1px solid #fff3;border-radius:8px;padding:8px;font-size:14px;touch-action:pan-y;box-sizing:border-box}
+/* theme-proof: app buttons take colours from light/dark/amoled theme and from button:not(.g) (orange); dark overlays must not */
+.pv{--bg:#0b0b0f;--cd:#1b1b22;--tx:#fff;--mu:#b9c0cc;--br:#ffffff40;--ac:#35e0d0;color:#fff}
+.pvh{flex-wrap:wrap}
+.pv button{background:#ffffff1f!important;color:#fff!important;border:1px solid #ffffff55!important;box-shadow:none!important;border-radius:10px!important;font-weight:600;font-size:14px;min-height:0;padding:8px 12px}
+.pv button.on{background:#2f9e4466!important;border-color:#2f9e44!important}
+.pv .pvn{background:#000a!important;font-size:24px;padding:0;width:30px;height:46px;margin-top:-23px;opacity:.75;border-radius:8px!important}
+.pv.pvzm .pvn{display:none}
+.pv .pvtx textarea{color:#fff}
+#snov button.g,#snco button.g{background:#ffffff22!important;color:#fff!important;border:1px solid #ffffff66!important}
+.pba button,.pbt button,.tgctl button{box-shadow:none!important}
 </style><script>
 /* ===== Crop box (drag handles) + PDF page previews ===== */
 let CBX=null,CBV=null;
@@ -2834,7 +2846,7 @@ function pvOpen(items,idx,mode){if(PV)PV.close();const o=document.createElement(
  let cur=idx,z=1,x=0,y=0,w0=1,h0=1,k0=1,tok=0,after=true,tm=0,tg=0,tm2=0,TL=new Map(),mem=new Map(),view='live',base=items,ex=null,exSt=0,up=0,pg=null,vp=null,rv=0,SW=1,SH=1,rb=0,ag=0;
  vv.style.display=tool?'':'none';vb[2].style.display=tool&&['pr','pn','wm'].includes(tl)?'':'none';bS.style.display=tool&&tl!='pn'?'':'none';
  const clampPos=()=>{const cw=w0*z,ch=h0*z;x=cw<=SW?(SW-cw)/2:Math.min(0,Math.max(SW-cw,x));y=ch<=SH?(SH-ch)/2:Math.min(0,Math.max(SH-ch,y))},
- apply=()=>{clampPos();w.style.transform=`translate(${x}px,${y}px) scale(${z})`;zc.textContent=' · '+Math.round(z*100)+'%'},fit=()=>{z=1;x=(SW-w0)/2;y=(SH-h0)/2;apply()},
+ apply=()=>{clampPos();w.style.transform=`translate(${x}px,${y}px) scale(${z})`;zc.textContent=' · '+Math.round(z*100)+'%';o.classList.toggle('pvzm',z>1.05)},fit=()=>{z=1;x=(SW-w0)/2;y=(SH-h0)/2;apply()},
  zoomAt=(cx,cy,f)=>{const r=st.getBoundingClientRect(),nz=Math.min(8,Math.max(1,z*f)),a=(cx-r.left-x)/z,b=(cy-r.top-y)/z;z=nz;x=cx-r.left-a*z;y=cy-r.top-b*z;apply();later()},
  later=n=>{if(tm)return;tm=setTimeout(()=>{tm=0;tiles();if(tool&&tl=='wm'&&!tm2)tm2=setTimeout(()=>{tm2=0;ovl()},400)},n||80)},
  hdSet=t=>{hd.textContent=t;hd.style.background=t=='HD'?'#2f9e44':'#f08c00'},
