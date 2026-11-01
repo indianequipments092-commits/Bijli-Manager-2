@@ -2402,8 +2402,8 @@ function view(){
  return`<div class="bar"><button class="g" onclick="SOL.back()">‹ Back</button><h2>☀️ Solar Units</h2><span></span></div>
 <div class="sl-sub">${SUB.map(t=>`<button class="${t[0]==V?'':'g'}" onclick="SOL.open('${t[0]}')"><i>${t[1]}</i>${t[2]}</button>`).join('')}</div>`+body}
 function hub(){return`<div class="bar"><h2>More</h2></div>
-<section class="card"><h3>Extra tools</h3><div class="grid"><button class="g" style="padding:14px 8px;text-align:center" onclick="SOL.open('entry')"><span style="font-size:22px;display:block">☀️</span>Solar Units</button>${window.PVT?`<button class="g" style="padding:14px 8px;text-align:center" onclick="PVT.open()"><span style="font-size:22px;display:block">🔒</span>Pvt Documents</button>`:''}</div></section>
-<p class="mu" style="text-align:center">Solar ka daily unit count, customer accounts aur bills. Ye data Bijli Manager ke main Backup me bhi aata hai. Pvt Documents ka data alag encrypted rehta hai, main Backup me sirf chhota index (naam aur count) jata hai.</p>`}
+<section class="card"><h3>Extra tools</h3><div class="grid"><button class="g" style="padding:14px 8px;text-align:center" onclick="SOL.open('entry')"><span style="font-size:22px;display:block">☀️</span>Solar Units</button>${window.PVT?`<button class="g" style="padding:14px 8px;text-align:center" onclick="PVT.open()"><svg class="pqi" style="width:26px;height:26px;display:block;margin:0 auto 4px;color:var(--am)" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.2c0 4.4-2.9 8-7 9.3-4.1-1.3-7-4.9-7-9.3V6z"/><rect x="9.3" y="10.8" width="5.4" height="4.2" rx="1.1"/><path d="M10.4 10.8V9.9a1.6 1.6 0 0 1 3.2 0v.9"/></svg>Pvt Documents</button>`:''}</div></section>
+<p class="mu" style="text-align:center">Daily solar unit count, customer accounts and bills. This data is also included in the main Bijli Manager Backup. Pvt Documents data stays separately encrypted; only a small index (names and counts) goes into the main Backup.</p>`}
 function open(v){V=v;go();scrollTo(0,0)}
 function back(){V=null;go();scrollTo(0,0)}
 const empty=t=>`<section class="card" style="text-align:center"><p class="mu">${t}</p><div class="row" style="justify-content:center"><button onclick="SOL.open('cust')">Setup karo</button></div></section>`;
@@ -2575,7 +2575,28 @@ function exp(){return D}
 function imp(o){const er=checkBk(o);if(er){alert('Backup me solar data galat tha, solar restore nahi hua: '+er);return}try{localStorage.setItem(KEY+'_prev',JSON.stringify(D))}catch(x){}D=Object.assign(defD(),o);D.flags=D.flags||{};D.payments=D.payments||[];sv()}
 return{exp,imp,view,open,back,chD,setD,setM,setR,roll,mForm,mSave,mDel,payForm,paySave,payList,payDel,pdfBill,setP,backup,csv,restoreFile,wipe,closeD}
 })();
-</script><script>/* ===== More > Pvt Documents (PIN lock, AES-GCM encrypted, IndexedDB, own storage; does not touch Bijli data) ===== */
+</script><style>
+.pqi{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-4px}
+.pqi.s{width:14px;height:14px;vertical-align:-2px}
+.pqb{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+button.pqs{padding:7px 12px;font-size:13px;min-height:0}
+button.pqic{padding:8px;min-width:36px}
+.bar h2.pqt{display:flex;align-items:center;gap:7px;min-width:0;font-size:18px;white-space:nowrap}.pqt .pqi{width:22px;height:22px;color:var(--am)}
+.pqh{display:flex;align-items:center;gap:8px}.pqh .pqi{color:var(--am)}
+.pqhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.pqhd h3{margin:0}
+.pqchips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.pqchips::-webkit-scrollbar{display:none}
+button.g.pqchip{flex:none;display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:8px 15px;font-weight:600;white-space:nowrap}
+button.g.pqchip small{font-size:12px;font-weight:700;opacity:.6;font-variant-numeric:tabular-nums}
+button.g.pqchip.on{background:linear-gradient(135deg,var(--am),color-mix(in srgb,var(--am) 75%,#fff));border-color:transparent;color:#1a1200;box-shadow:0 8px 18px -10px var(--am)}
+button.g.pqchip.on small{opacity:.75}
+.pqact{display:flex;align-items:center;gap:2px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--br)}
+.pqwho{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mu);margin-right:auto;min-width:0}.pqwho b{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42vw}
+button.g.pql{border:0;background:transparent;padding:7px 10px;border-radius:10px;font-size:13px;font-weight:600;color:var(--ac);display:inline-flex;align-items:center;gap:6px;box-shadow:none}
+button.g.pql.pqdel{color:var(--bad)}
+button.g.pql:active{background:color-mix(in srgb,currentColor 12%,transparent)}
+.pqsr{position:relative}.pqsr .pqi{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none}.pqsr input{width:100%;box-sizing:border-box;padding-left:38px}
+.pqem{text-align:center;padding:14px 0}.pqem .pqi{width:34px;height:34px;opacity:.55;display:block;margin:0 auto 6px;color:var(--mu)}.pqem p{margin:0}
+</style><script>/* ===== More > Pvt Documents (PIN lock, AES-GCM encrypted, IndexedDB, own storage; does not touch Bijli data) ===== */
 window.PVT=(()=>{
 const LK='bijli_pvt_v1',LKL='bijli_pvt_lk',IXK='bijli_pvt_idx',IT=3e5,IDLE=12e4,IDR=/^[A-Za-z0-9_-]{1,40}$/,TYS=['image/jpeg','image/png','application/pdf'];
 const CATS=['Aadhaar','PAN','Voter ID','Driving Licence','Passport','Bank','Property','Other'];
@@ -2584,13 +2605,49 @@ const st={pid:'',q:'',sel:new Set()};
 const E=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const Q=s=>document.querySelector(s),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const enc=new TextEncoder(),dec=new TextDecoder();
+const IC={
+lock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 14.8v2"/>',
+unlock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 7.4-2.1M12 14.8v2"/>',
+shield:'<path d="M12 3l7 3v5.2c0 4.4-2.9 8-7 9.3-4.1-1.3-7-4.9-7-9.3V6z"/><rect x="9.3" y="10.8" width="5.4" height="4.2" rx="1.1"/><path d="M10.4 10.8V9.9a1.6 1.6 0 0 1 3.2 0v.9"/>',
+back:'<path d="M15 5l-7 7 7 7"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>',
+users:'<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M16 5.8a3 3 0 0 1 0 5.4M17.5 14.3c2 .5 3.5 2.2 3.5 4.7"/>',
+pencil:'<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+trash:'<path d="M4 7h16M10 3.5h4M6.5 7l1 12a1.5 1.5 0 0 0 1.5 1.4h6a1.5 1.5 0 0 0 1.5-1.4l1-12M10 11v6M14 11v6"/>',
+search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+fileplus:'<path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5M12 11.5v6M9 14.5h6"/>',
+filedown:'<path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5l2.5 2.5 2.5-2.5"/>',
+file:'<path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5M9 13h6M9 16.5h4"/>',
+image:'<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.7"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>',
+camera:'<path d="M4 8.5A2 2 0 0 1 6 6.5h1.6L9 4.5h6l1.4 2H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.3"/>',
+checksq:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.2l2.5 2.5 4.5-5"/>',
+check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+x:'<path d="M6 6l12 12M18 6L6 18"/>',
+up:'<path d="M6 14l6-6 6 6"/>',
+down:'<path d="M6 10l6 6 6-6"/>',
+download:'<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
+upload:'<path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19.5h14"/>',
+archive:'<rect x="3.5" y="4" width="17" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/>',
+braces:'<path d="M8.5 4C6.5 4 6 5 6 6.5v2C6 10 5 11.5 3.5 12 5 12.5 6 14 6 15.5v2C6 19 6.5 20 8.5 20M15.5 4c2 0 2.5 1 2.5 2.5v2c0 1.5 1 3 2.5 3.5-1.5.5-2.5 2-2.5 3.5v2c0 1.5-.5 2.5-2.5 2.5"/>',
+cloud:'<path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 9.6 4.5 4.5 0 0 0 7 18.5z"/>',
+cloudup:'<path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 9.6 4.5 4.5 0 0 0 7 18.5z"/><path d="M12 16v-5M9.8 12.8l2.2-2.2 2.2 2.2"/>',
+clouddown:'<path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.4 9.6 4.5 4.5 0 0 0 7 18.5z"/><path d="M12 10v6M9.8 13.8l2.2 2.2 2.2-2.2"/>',
+folder:'<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+share:'<circle cx="17.5" cy="6" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18" r="2.5"/><path d="M8.7 10.8l6.6-3.6M8.7 13.2l6.6 3.6"/>',
+eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5M14 9l2 2"/>',
+clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+warn:'<path d="M12 4l9 15.5H3z"/><path d="M12 10v4M12 17v.01"/>',
+done:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.3l2.4 2.4 4.6-5"/>'};
+const I=(n,c)=>`<svg class="pqi${c?' '+c:''}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 const b2s=u=>{let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
 const s2b=s=>{const t=atob(s),u=new Uint8Array(t.length);for(let i=0;i<t.length;i++)u[i]=t.charCodeAt(i);return u};
 const today=()=>new Date().toLocaleDateString('en-CA');
 const dmy=d=>{const q=String(d||'').split('-');return q.length==3?q[2]+'/'+q[1]+'/'+q[0]:(d||'')};
 const dd=(a,b)=>{const g=s=>{const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};return Math.round((g(a)-g(b))/864e5)};
 const MB=n=>(n/1048576).toFixed(n>1e7?0:1)+' MB';
-const lib=(u,t)=>new Promise((ok,no)=>{if(window[t])return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Library load nahi hui. Internet chalu karo (sirf pehli baar chahiye).'));document.head.appendChild(s)});
+const lib=(u,t)=>new Promise((ok,no)=>{if(window[t])return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Could not load the library. Turn on the internet (needed only the first time).'));document.head.appendChild(s)});
 const JZL=()=>lib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js','JSZip'),PLL=()=>lib('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js','PDFLib');
 
 /* ---- crypto ---- */
@@ -2599,11 +2656,11 @@ async function seal(k,u){const iv=crypto.getRandomValues(new Uint8Array(12));ret
 const unseal=async(k,iv,ct)=>new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},k,ct));
 
 /* ---- IndexedDB ---- */
-let _db;const db=()=>_db||(_db=new Promise((ok,no)=>{if(!window.indexedDB)return no(new Error('Is browser me secure storage nahi hai'));const r=indexedDB.open('bm_pvt',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('kv');d.createObjectStore('blob')};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}));
+let _db;const db=()=>_db||(_db=new Promise((ok,no)=>{if(!window.indexedDB)return no(new Error('Secure storage is not available in this browser'));const r=indexedDB.open('bm_pvt',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('kv');d.createObjectStore('blob')};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}));
 const tx=async(s,m,fn)=>{const d=await db();return new Promise((ok,no)=>{const t=d.transaction(s,m),r=fn(t.objectStore(s));t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error);t.onabort=()=>no(t.error||new Error('storage error'))})};
 const iget=(s,k)=>tx(s,'readonly',o=>o.get(k)),iput=(s,k,v)=>tx(s,'readwrite',o=>o.put(v,k)),idel=(s,k)=>tx(s,'readwrite',o=>o.delete(k)),iclr=s=>tx(s,'readwrite',o=>o.clear());
 const putF=async(id,u)=>iput('blob',id,await seal(KEY,u));
-const getF=async id=>{const r=await iget('blob',id);if(!r)throw new Error('File nahi mili');return unseal(KEY,r.iv,r.ct)};
+const getF=async id=>{const r=await iget('blob',id);if(!r)throw new Error('File not found');return unseal(KEY,r.iv,r.ct)};
 function idxSave(){try{const c={};M.docs.forEach(d=>c[d.pid]=(c[d.pid]||0)+1);localStorage.setItem(IXK,JSON.stringify({persons:M.persons.map(p=>({name:p.n,docs:c[p.id]||0})),docs:M.docs.length}))}catch(x){}}
 const saveM=async()=>{await iput('kv','meta',await seal(KEY,enc.encode(JSON.stringify(M))));idxSave()};
 const norm=()=>{M=M||{};M.persons=Array.isArray(M.persons)?M.persons:[];M.cats=Array.isArray(M.cats)?M.cats:[];M.docs=Array.isArray(M.docs)?M.docs:[]};
@@ -2624,59 +2681,61 @@ const on=()=>ON;
 const idx=()=>{try{return JSON.parse(localStorage.getItem(IXK))}catch(x){return null}};
 
 /* ---- screens ---- */
-const hdr=r=>`<div class="bar"><button class="g" onclick="PVT.back()">‹ Back</button><h2>🔒 Pvt Documents</h2>${r||'<span></span>'}</div>`;
+const hdr=r=>`<div class="bar"><button class="g pqb" onclick="PVT.back()">${I('back')}Back</button><h2 class="pqt">${I('shield')}Pvt Documents</h2>${r||'<span></span>'}</div>`;
 function view(){
- if(!meta())return hdr()+`<section class="card"><h3>Naya lock banao</h3><label>PIN (4 se 10 digit)<input id="pv_a" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><label>PIN dobara<input id="pv_b" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><div class="row"><button onclick="PVT.setup()">Lock banao</button></div><p id="pv_e" class="w"></p><p class="mu">Saare documents is PIN se encrypt hote hain aur sirf is phone me rehte hain. <b>PIN bhool gaye to data wapas nahi aayega.</b> Lamba PIN zyada safe hai. Backup zaroor lete raho.</p></section>
-<section class="card"><h3>Purani backup hai?</h3><p class="mu">Naye phone par backup file se seedha restore kar sakte ho. Wahi PIN chalega jo backup ke waqt tha.</p><div class="row"><button class="g" onclick="document.getElementById('pv_rf').click()">Backup se restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)"></section>`;
- if(!KEY)return hdr()+`<section class="card" style="text-align:center"><h3>PIN daalo</h3><input id="pv_p" type="password" inputmode="numeric" maxlength="10" autocomplete="off" autofocus onkeydown="if(event.key==='Enter')PVT.unlock()" style="text-align:center;font-size:24px;letter-spacing:8px"><div class="row" style="justify-content:center"><button onclick="PVT.unlock()">Unlock</button></div><p id="pv_e" class="w"></p><div class="row" style="justify-content:center"><button class="g" style="color:var(--bad)" onclick="PVT.forgot()">PIN bhool gaye</button></div></section>`;
- return hdr('<button class="g" onclick="PVT.lock()">🔒 Lock</button>')+mainV()}
-function expTag(x){if(!x)return'';const n=dd(x,today());return n<0?' · <span class="w">⚠ expire '+dmy(x)+'</span>':n<=30?' · <span class="w">⏰ '+n+' din baaki</span>':' · exp '+dmy(x)}
+ if(!meta())return hdr()+`<section class="card"><h3 class="pqh">${I('lock')}Create a new lock</h3><label>PIN (4 to 10 digits)<input id="pv_a" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><label>Confirm PIN<input id="pv_b" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label><div class="row"><button class="pqb" onclick="PVT.setup()">${I('lock')}Create lock</button></div><p id="pv_e" class="w"></p><p class="mu">All documents are encrypted with this PIN and stay only on this phone. <b>If you forget the PIN, the data cannot be recovered.</b> A longer PIN is safer. Take backups regularly.</p></section>
+<section class="card"><h3 class="pqh">${I('upload')}Have an old backup?</h3><p class="mu">On a new phone you can restore straight from a backup file. Use the same PIN you had when the backup was made.</p><div class="row"><button class="g pqb" onclick="document.getElementById('pv_rf').click()">${I('upload')}Restore from backup</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)"></section>`;
+ if(!KEY)return hdr()+`<section class="card" style="text-align:center"><h3 class="pqh" style="justify-content:center">${I('lock')}Enter PIN</h3><input id="pv_p" type="password" inputmode="numeric" maxlength="10" autocomplete="off" autofocus onkeydown="if(event.key==='Enter')PVT.unlock()" style="text-align:center;font-size:24px;letter-spacing:8px"><div class="row" style="justify-content:center"><button class="pqb" onclick="PVT.unlock()">${I('unlock')}Unlock</button></div><p id="pv_e" class="w"></p><div class="row" style="justify-content:center"><button class="g pqb" style="color:var(--bad)" onclick="PVT.forgot()">${I('key')}Forgot PIN</button></div></section>`;
+ return hdr('<button class="g pqb" onclick="PVT.lock()">'+I('lock')+'Lock</button>')+mainV()}
+function expTag(x){if(!x)return'';const n=dd(x,today());return n<0?' · <span class="w">'+I('warn','s')+' Expired '+dmy(x)+'</span>':n<=30?' · <span class="w">'+I('clock','s')+' '+n+' day'+(n==1?'':'s')+' left</span>':' · Exp '+dmy(x)}
 function filt(){const q=st.q.trim().toLowerCase();return M.docs.filter(d=>(!st.pid||d.pid==st.pid)&&(!q||[d.n,d.cat,d.note,(M.persons.find(p=>p.id==d.pid)||{}).n].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.t-a.t)}
-function rows(){const l=filt();if(!l.length)return`<p class="mu" style="text-align:center">${M.docs.length?'Kuch nahi mila':'Abhi koi document nahi. Pehle person banao, phir + Document dabao.'}</p>`;
- return l.map(d=>{const p=M.persons.find(x=>x.id==d.pid);return`<div class="li" style="cursor:default"><label style="display:flex;gap:10px;align-items:center;margin:0;flex:1;min-width:0"><input type="checkbox" style="width:auto;margin:0;flex:none" ${st.sel.has(d.id)?'checked':''} onchange="PVT.tog('${d.id}',this.checked)"><span style="min-width:0"><b>${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${E(d.cat)} · ${d.pg.length} page${expTag(d.exp)}</span></span></label><button class="g" onclick="PVT.show('${d.id}')">Kholo</button></div>`}).join('')}
+function rows(){const l=filt();if(!l.length)return`<div class="pqem">${I('folder')}<p class="mu">${M.docs.length?'Nothing found':'No documents yet. Add a person first, then tap + Document.'}</p></div>`;
+ return l.map(d=>{const p=M.persons.find(x=>x.id==d.pid),n=d.pg.length;return`<div class="li" style="cursor:default"><label style="display:flex;gap:10px;align-items:center;margin:0;flex:1;min-width:0"><input type="checkbox" style="width:auto;margin:0;flex:none" ${st.sel.has(d.id)?'checked':''} onchange="PVT.tog('${d.id}',this.checked)"><span style="min-width:0"><b>${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${E(d.cat)} · ${n} page${n==1?'':'s'}${expTag(d.exp)}</span></span></label><button class="g pqb pqs" onclick="PVT.show('${d.id}')">${I('eye')}Open</button></div>`}).join('')}
 function mainV(){
  const c={};M.docs.forEach(d=>c[d.pid]=(c[d.pid]||0)+1);
  const soon=M.docs.filter(d=>d.exp&&dd(d.exp,today())<=30).sort((a,b)=>a.exp<b.exp?-1:1);
  const sp=st.pid?M.persons.find(p=>p.id==st.pid):null;
- return(soon.length?`<section class="card"><h3>⏰ Expiry paas</h3>${soon.map(d=>`<div class="mu">${E(d.n)} (${E((M.persons.find(p=>p.id==d.pid)||{}).n||'-')})${expTag(d.exp)}</div>`).join('')}</section>`:'')+
- `<section class="card"><h3>Person</h3><div class="row" style="margin:0"><button class="${st.pid?'g':''}" onclick="PVT.pick('')">Sab (${M.docs.length})</button>${M.persons.map(p=>`<button class="${st.pid==p.id?'':'g'}" onclick="PVT.pick('${p.id}')">${E(p.n)} (${c[p.id]||0})</button>`).join('')}<button class="g" onclick="PVT.pForm()">+ Person</button></div>${sp?`<div class="row"><button class="g" onclick="PVT.pForm('${sp.id}')">Naam badlo</button><button class="g" style="color:var(--bad)" onclick="PVT.pDel('${sp.id}')">${E(sp.n)} delete</button></div>`:''}</section>
-<section class="card"><input type="search" placeholder="Naam ya category se dhundo" value="${E(st.q)}" oninput="PVT.search(this.value)"><div class="row"><button onclick="PVT.dForm()">+ Document</button><button id="pv_ex" onclick="PVT.exDlg()">Export PDF (${st.sel.size})</button><button class="g" onclick="PVT.selAll()">Sab select</button><button class="g" onclick="PVT.selNone()">Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
-<section class="card"><h3>Backup</h3><p class="mu">Backup PIN se encrypted hota hai. ZIP bade data ke liye (file .pvz), JSON chhote data ke liye. Restore me file khud pehchani jati hai.</p><div class="row"><button onclick="PVT.bkZip()">ZIP backup</button><button class="g" onclick="PVT.bkJson()">JSON backup</button><button class="g" onclick="document.getElementById('pv_rf').click()">Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)">
-<h3 style="margin-top:16px">Cloud backup (Supabase)</h3><p class="mu">Encrypted .pvz file aapke login ke private folder me jati hai. Bijli ke Settings me Cloud sync se login hona chahiye. Sirf aap dabao tab upload hota hai.</p><div class="row"><button onclick="PVT.cloudUp()">☁️ Cloud backup</button><button class="g" onclick="PVT.cloudDown()">Cloud restore</button></div><p id="pv_cs" class="mu"></p><p id="pv_cl" class="mu">${(()=>{try{const w=localStorage.getItem(CBK);return w?'Aakhri cloud backup: '+E(w):''}catch(x){return''}})()}</p></section>`}
-function refresh(){const l=Q('#pv_list');if(l)l.innerHTML=rows();const b=Q('#pv_ex');if(b)b.textContent='Export PDF ('+st.sel.size+')'}
-const pick=id=>{st.pid=id;go()};
+ const chip=(id,nm,n)=>`<button class="g pqchip${st.pid==id?' on':''}" onclick="PVT.pick('${id}')">${nm}<small>${n}</small></button>`;
+ return(soon.length?`<section class="card"><h3 class="pqh">${I('clock')}Expiring soon</h3>${soon.map(d=>`<div class="mu">${E(d.n)} (${E((M.persons.find(p=>p.id==d.pid)||{}).n||'-')})${expTag(d.exp)}</div>`).join('')}</section>`:'')+
+ `<section class="card"><div class="pqhd"><h3 class="pqh">${I('users')}Person</h3><button class="g pqb pqs" onclick="PVT.pForm()">${I('plus')}Person</button></div><div class="pqchips">${chip('','All',M.docs.length)}${M.persons.map(p=>chip(p.id,E(p.n),c[p.id]||0)).join('')}</div>${sp?`<div class="pqact"><span class="pqwho">${I('user')}<b>${E(sp.n)}</b></span><button class="g pql" onclick="PVT.pForm('${sp.id}')">${I('pencil')}Rename</button><button class="g pql pqdel" onclick="PVT.pDel('${sp.id}')">${I('trash')}Delete</button></div>`:''}</section>
+<section class="card"><div class="pqsr">${I('search')}<input type="search" placeholder="Search by name or category" value="${E(st.q)}" oninput="PVT.search(this.value)"></div><div class="row"><button class="pqb" onclick="PVT.dForm()">${I('fileplus')}Document</button><button id="pv_ex" class="pqb" onclick="PVT.exDlg()">${I('filedown')}<span id="pv_exn">Export PDF (${st.sel.size})</span></button><button class="g pqb" onclick="PVT.selAll()">${I('checksq')}Select all</button><button class="g pqb" onclick="PVT.selNone()">${I('x')}Clear</button></div><div id="pv_list" style="margin-top:8px">${rows()}</div></section>
+<section class="card"><h3 class="pqh">${I('archive')}Backup</h3><p class="mu">Backups are encrypted with your PIN. Use ZIP for large data (.pvz file) and JSON for small data. The file type is detected automatically on restore.</p><div class="row"><button class="pqb" onclick="PVT.bkZip()">${I('archive')}ZIP backup</button><button class="g pqb" onclick="PVT.bkJson()">${I('braces')}JSON backup</button><button class="g pqb" onclick="document.getElementById('pv_rf').click()">${I('upload')}Restore</button></div><input id="pv_rf" type="file" hidden onchange="PVT.restPick(this)">
+<h3 class="pqh" style="margin-top:16px">${I('cloud')}Cloud backup (Supabase)</h3><p class="mu">The encrypted .pvz file goes to a private folder under your login. You must be signed in through Cloud sync in Bijli Settings. It uploads only when you tap the button.</p><div class="row"><button class="pqb" onclick="PVT.cloudUp()">${I('cloudup')}Cloud backup</button><button class="g pqb" onclick="PVT.cloudDown()">${I('clouddown')}Cloud restore</button></div><p id="pv_cs" class="mu"></p><p id="pv_cl" class="mu">${(()=>{try{const w=localStorage.getItem(CBK);return w?'Last cloud backup: '+E(w):''}catch(x){return''}})()}</p></section>`}
+function refresh(){const l=Q('#pv_list');if(l)l.innerHTML=rows();refresh2()}
+const fixChip=()=>setTimeout(()=>{const c=Q('.pqchip.on'),w=Q('.pqchips');if(c&&w)w.scrollLeft=c.offsetLeft-(w.clientWidth-c.offsetWidth)/2},0);
+const pick=id=>{st.pid=id;go();fixChip()};
 const search=v=>{st.q=v;refresh()};
 const tog=(id,v)=>{v?st.sel.add(id):st.sel.delete(id);refresh2()};
-const refresh2=()=>{const b=Q('#pv_ex');if(b)b.textContent='Export PDF ('+st.sel.size+')'};
+const refresh2=()=>{const b=Q('#pv_exn');if(b)b.textContent='Export PDF ('+st.sel.size+')'};
 const selAll=()=>{filt().forEach(d=>st.sel.add(d.id));refresh()};
 const selNone=()=>{st.sel.clear();refresh()};
 
 /* ---- setup / unlock ---- */
 async function setup(){const a=Q('#pv_a').value,b=Q('#pv_b').value,er=Q('#pv_e');
- if(!/^\d{4,10}$/.test(a)){er.textContent='PIN sirf number, 4 se 10 digit';return}
- if(a!==b){er.textContent='Dono PIN same nahi hain';return}
- er.textContent='Lock ban raha hai…';
- try{const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(a,salt);await saveLock(salt,k);KEY=k;M={persons:[],cats:[],docs:[]};await saveM();touch();go()}catch(x){KEY=null;er.textContent='Nahi bana: '+(x.message||x)}}
+ if(!/^\d{4,10}$/.test(a)){er.textContent='PIN must be numbers only, 4 to 10 digits';return}
+ if(a!==b){er.textContent='The two PINs do not match';return}
+ er.textContent='Creating lock…';
+ try{const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(a,salt);await saveLock(salt,k);KEY=k;M={persons:[],cats:[],docs:[]};await saveM();touch();go()}catch(x){KEY=null;er.textContent='Could not create: '+(x.message||x)}}
 async function unlock(){const i=Q('#pv_p'),er=Q('#pv_e'),m=meta();let L={};try{L=JSON.parse(localStorage.getItem(LKL)||'{}')}catch(x){}
- if(L.until>Date.now()){er.textContent='Bahut galat try. '+Math.ceil((L.until-Date.now())/1e3)+' sec ruko.';i.value='';return}
- er.textContent='Check ho raha hai…';
+ if(L.until>Date.now()){er.textContent='Too many wrong attempts. Wait '+Math.ceil((L.until-Date.now())/1e3)+' sec.';i.value='';return}
+ er.textContent='Checking…';
  try{const k=await derive(i.value,s2b(m.s));if(dec.decode(await unseal(k,s2b(m.i),s2b(m.c)))!=='pvt-ok')throw 0;
   const r=await iget('kv','meta');KEY=k;M=r?JSON.parse(dec.decode(await unseal(k,r.iv,r.ct))):{};norm();try{localStorage.removeItem(LKL)}catch(x){}touch();go()}
- catch(x){KEY=null;M=null;const n=(L.n||0)+1,w=n>=5?Math.min(300,30*2**(n-5)):0;try{localStorage.setItem(LKL,JSON.stringify({n,until:w?Date.now()+w*1e3:0}))}catch(y){}er.textContent=w?'Bahut galat try. '+w+' sec ruko.':'Galat PIN';i.value=''}}
-async function forgot(){if(!confirm('Saare Pvt Documents hamesha ke liye delete honge aur naya lock banega. Bina PIN ke data wapas nahi aa sakta. Aage badhein?')||!confirm('Pakka? Ye undo nahi hoga.'))return;
- try{await iclr('blob');await iclr('kv');localStorage.removeItem(LK);localStorage.removeItem(LKL);localStorage.removeItem(IXK)}catch(x){alert('Delete nahi hua: '+(x.message||x));return}go()}
+ catch(x){KEY=null;M=null;const n=(L.n||0)+1,w=n>=5?Math.min(300,30*2**(n-5)):0;try{localStorage.setItem(LKL,JSON.stringify({n,until:w?Date.now()+w*1e3:0}))}catch(y){}er.textContent=w?'Too many wrong attempts. Wait '+w+' sec.':'Wrong PIN';i.value=''}}
+async function forgot(){if(!confirm('All Pvt Documents will be deleted permanently and a new lock will be created. Without the PIN the data cannot be recovered. Continue?')||!confirm('Are you sure? This cannot be undone.'))return;
+ try{await iclr('blob');await iclr('kv');localStorage.removeItem(LK);localStorage.removeItem(LKL);localStorage.removeItem(IXK)}catch(x){alert('Could not delete: '+(x.message||x));return}go()}
 
 /* ---- dialog helper ---- */
 function dg(h){let d=Q('#pvd');if(!d){d=document.createElement('dialog');d.id='pvd';d.style.maxHeight='88vh';d.style.overflow='auto';document.body.appendChild(d);d.addEventListener('close',()=>{free()})}d.innerHTML='<form method="dialog" onsubmit="return false">'+h+'</form>';if(!d.open)d.showModal();touch()}
 const cl=()=>{const d=Q('#pvd');if(d&&d.open)d.close()};
 
 /* ---- persons ---- */
-function pForm(id){const p=id?M.persons.find(x=>x.id==id):null;dg(`<h3>${p?'Naam badlo':'Naya person'}</h3><label>Naam (Self, Papa, Ammi, customer...)<input id="pv_pn" value="${E(p?p.n:'')}" maxlength="40"></label><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" onclick="PVT.pSave('${id||''}')">Save</button></div>`)}
-async function pSave(id){const n=Q('#pv_pn').value.trim();if(!n){alert('Naam likho');return}
- if(M.persons.some(p=>p.id!=id&&p.n.toLowerCase()==n.toLowerCase())){alert('Ye person pehle se hai');return}
- try{if(id)M.persons.find(p=>p.id==id).n=n;else{const p={id:uid(),n};M.persons.push(p);st.pid=p.id}await saveM();cl();go()}catch(x){alert('Save nahi hua: '+(x.message||x))}}
-async function pDel(id){const p=M.persons.find(x=>x.id==id),ds=M.docs.filter(d=>d.pid==id);if(!p||!confirm(p.n+' aur uske '+ds.length+' document delete honge. Pakka?'))return;
- try{for(const d of ds)for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(d=>d.pid!=id);M.persons=M.persons.filter(x=>x.id!=id);ds.forEach(d=>st.sel.delete(d.id));st.pid='';await saveM();go()}catch(x){alert('Delete nahi hua: '+(x.message||x))}}
+function pForm(id){const p=id?M.persons.find(x=>x.id==id):null;dg(`<h3>${p?'Rename person':'New person'}</h3><label>Name (Self, Dad, Mom, customer...)<input id="pv_pn" value="${E(p?p.n:'')}" maxlength="40"></label><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" onclick="PVT.pSave('${id||''}')">${I('check')}Save</button></div>`)}
+async function pSave(id){const n=Q('#pv_pn').value.trim();if(!n){alert('Enter a name');return}
+ if(M.persons.some(p=>p.id!=id&&p.n.toLowerCase()==n.toLowerCase())){alert('This person already exists');return}
+ try{if(id)M.persons.find(p=>p.id==id).n=n;else{const p={id:uid(),n};M.persons.push(p);st.pid=p.id}await saveM();cl();go();fixChip()}catch(x){alert('Could not save: '+(x.message||x))}}
+async function pDel(id){const p=M.persons.find(x=>x.id==id),ds=M.docs.filter(d=>d.pid==id);if(!p||!confirm(p.n+' and its '+ds.length+' document(s) will be deleted. Are you sure?'))return;
+ try{for(const d of ds)for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(d=>d.pid!=id);M.persons=M.persons.filter(x=>x.id!=id);ds.forEach(d=>st.sel.delete(d.id));st.pid='';await saveM();go()}catch(x){alert('Could not delete: '+(x.message||x))}}
 
 /* ---- add / edit document ---- */
 const catList=()=>CATS.concat(M.cats.filter(c=>!CATS.includes(c)));
@@ -2684,41 +2743,41 @@ function dForm(id){
  if(!M.persons.length){pForm();return}
  const d=id?M.docs.find(x=>x.id==id):null;
  PD={id:id||'',pend:[],rem:new Set(),old:d?d.pg.slice():[]};
- dg(`<h3>${d?'Document edit':'Naya document'}</h3>
+ dg(`<h3>${d?'Edit document':'New document'}</h3>
 <label>Person<select id="pv_dp">${M.persons.map(p=>`<option value="${p.id}" ${(d?d.pid==p.id:st.pid==p.id)?'selected':''}>${E(p.n)}</option>`).join('')}</select></label>
 <label>Category<select id="pv_dc">${catList().map(c=>`<option ${d&&d.cat==c?'selected':''}>${E(c)}</option>`).join('')}</select></label>
-<label>Ya nayi category<input id="pv_dn" maxlength="30" placeholder="optional"></label>
-<label>Naam<input id="pv_dm" maxlength="60" value="${E(d?d.n:'')}" placeholder="jaise Aadhaar Card"></label>
+<label>Or a new category<input id="pv_dn" maxlength="30" placeholder="optional"></label>
+<label>Name<input id="pv_dm" maxlength="60" value="${E(d?d.n:'')}" placeholder="e.g. Aadhaar Card"></label>
 <label>Note<textarea id="pv_dt" rows="2" maxlength="300">${E(d?d.note:'')}</textarea></label>
 <label>Expiry date (optional)<input id="pv_dx" type="date" value="${E(d&&d.exp||'')}"></label>
-<div class="row"><button type="button" onclick="document.getElementById('pv_fc').click()">📷 Camera</button><button type="button" class="g" onclick="document.getElementById('pv_fg').click()">🖼 Gallery</button><button type="button" class="g" onclick="document.getElementById('pv_ff').click()">📄 PDF / file</button></div>
+<div class="row"><button type="button" class="pqb" onclick="document.getElementById('pv_fc').click()">${I('camera')}Camera</button><button type="button" class="g pqb" onclick="document.getElementById('pv_fg').click()">${I('image')}Gallery</button><button type="button" class="g pqb" onclick="document.getElementById('pv_ff').click()">${I('file')}PDF / file</button></div>
 <input id="pv_fc" type="file" accept="image/*" capture="environment" hidden onchange="PVT.addF(this)"><input id="pv_fg" type="file" accept="image/*" multiple hidden onchange="PVT.addF(this)"><input id="pv_ff" type="file" accept="application/pdf,image/*" multiple hidden onchange="PVT.addF(this)">
 <div id="pv_pl"></div>
-<label style="display:flex;gap:10px;align-items:center;margin-top:8px"><input id="pv_dz" type="checkbox" style="width:auto;margin:0" checked> Photo ka size chhota karo</label>
-<p class="mu">Aadhaar jaise ke liye pehle Front, phir Back add karo.</p><p id="pv_de" class="w"></p>
-<div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_ds" onclick="PVT.dSave()">Save</button></div>`);
+<label style="display:flex;gap:10px;align-items:center;margin-top:8px"><input id="pv_dz" type="checkbox" style="width:auto;margin:0" checked> Reduce photo size</label>
+<p class="mu">For documents like Aadhaar, add the Front first, then the Back.</p><p id="pv_de" class="w"></p>
+<div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_ds" onclick="PVT.dSave()">${I('check')}Save</button></div>`);
  plist()}
 function plist(){const l=Q('#pv_pl');if(!l||!PD)return;
- const old=PD.old.filter(g=>!PD.rem.has(g.id)).map((g,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${g.ty=='application/pdf'?'📄':'🖼'} Page ${i+1} <span class="mu">(saved, ${MB(g.sz)})</span></span><button type="button" class="g" onclick="PVT.rmOld('${g.id}')">✕</button></div>`).join('');
- const nw=PD.pend.map((p,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span>${p.f.type=='application/pdf'?'📄':'🖼'} ${E(p.f.name||'photo')} <span class="mu">(${MB(p.f.size)})</span>${p.en?`<br><span class="w">🔒 Password wali PDF</span><br><input type="password" id="pv_pw${i}" placeholder="PDF ka password" autocomplete="off" style="margin:6px 0"><button type="button" onclick="PVT.unPdf(${i})">Password hatao</button> <span id="pv_pm${i}" class="mu"></span>`:''}</span><span><button type="button" class="g" onclick="PVT.mvP(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.mvP(${i},1)">▼</button> <button type="button" class="g" onclick="PVT.rmP(${i})">✕</button></span></div>`).join('');
- l.innerHTML=old+nw||'<p class="mu">Abhi koi page add nahi hua</p>'}
+ const old=PD.old.filter(g=>!PD.rem.has(g.id)).map((g,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span class="pqb" style="justify-content:flex-start">${I(g.ty=='application/pdf'?'file':'image')} Page ${i+1} <span class="mu">(saved, ${MB(g.sz)})</span></span><button type="button" class="g pqb pqic" aria-label="Remove page" onclick="PVT.rmOld('${g.id}')">${I('x')}</button></div>`).join('');
+ const nw=PD.pend.map((p,i)=>`<div class="li" style="cursor:default;padding:6px 0"><span style="min-width:0">${I(p.f.type=='application/pdf'?'file':'image')} ${E(p.f.name||'photo')} <span class="mu">(${MB(p.f.size)})</span>${p.en?`<br><span class="w">${I('lock','s')} Password-protected PDF</span><br><input type="password" id="pv_pw${i}" placeholder="PDF password" autocomplete="off" style="margin:6px 0"><button type="button" class="pqb" onclick="PVT.unPdf(${i})">${I('unlock')}Remove password</button> <span id="pv_pm${i}" class="mu"></span>`:''}</span><span class="pqb" style="gap:4px;align-self:flex-start"><button type="button" class="g pqb pqic" aria-label="Move up" onclick="PVT.mvP(${i},-1)">${I('up')}</button><button type="button" class="g pqb pqic" aria-label="Move down" onclick="PVT.mvP(${i},1)">${I('down')}</button><button type="button" class="g pqb pqic" aria-label="Remove" onclick="PVT.rmP(${i})">${I('x')}</button></span></div>`).join('');
+ l.innerHTML=old+nw||'<p class="mu">No pages added yet</p>'}
 const encPdf=async f=>{try{const t=new TextDecoder('latin1').decode(new Uint8Array(await f.arrayBuffer()));return /\/Encrypt\s*(<<|\d+\s+\d+\s+R)/.test(t)}catch(x){return false}};
 function addF(i){const a=[...i.files];i.value='';a.forEach(f=>{if(f.type=='application/pdf'||/^image\//.test(f.type)||/\.pdf$/i.test(f.name)){const p={f};PD.pend.push(p);if(f.type=='application/pdf'||/\.pdf$/i.test(f.name))encPdf(f).then(e=>{if(e){p.en=1;plist()}})}});plist()}
 const rmP=i=>{PD.pend.splice(i,1);plist()},rmOld=id=>{PD.rem.add(id);plist()};
 const mvP=(i,n)=>{const j=i+n;if(j<0||j>=PD.pend.length)return;[PD.pend[i],PD.pend[j]]=[PD.pend[j],PD.pend[i]];plist()};
-function loadImg(blob){return new Promise((ok,no)=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('Ye photo khul nahi paayi (format support nahi)'))};i.src=u})}
+function loadImg(blob){return new Promise((ok,no)=>{const u=URL.createObjectURL(blob),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('This photo could not be opened (format not supported)'))};i.src=u})}
 async function jpegOf(blob,max,q){const i=await loadImg(blob),s=Math.min(1,max/Math.max(i.naturalWidth,i.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(i.naturalWidth*s));c.height=Math.max(1,Math.round(i.naturalHeight*s));const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(i,0,0,c.width,c.height);
- return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Photo convert nahi hui')),'image/jpeg',q))}
+ return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Photo conversion failed')),'image/jpeg',q))}
 async function prep(f,small){ // -> {u8,ty}
  if(f.type=='application/pdf'||/\.pdf$/i.test(f.name))return{u8:new Uint8Array(await f.arrayBuffer()),ty:'application/pdf'};
  if(!small&&(f.type=='image/jpeg'||f.type=='image/png'))return{u8:new Uint8Array(await f.arrayBuffer()),ty:f.type};
  const b=await jpegOf(f,small?1800:4000,small?.82:.92);return{u8:new Uint8Array(await b.arrayBuffer()),ty:'image/jpeg'}}
 async function dSave(){
  const er=Q('#pv_de'),pid=Q('#pv_dp').value,nc=Q('#pv_dn').value.trim(),cat=nc||Q('#pv_dc').value,n=Q('#pv_dm').value.trim(),note=Q('#pv_dt').value.trim(),exp=Q('#pv_dx').value,sm=Q('#pv_dz').checked;
- if(!n){er.textContent='Document ka naam likho';return}
- const keep=PD.old.filter(g=>!PD.rem.has(g.id));if(!keep.length&&!PD.pend.length){er.textContent='Kam se kam ek page add karo';return}
+ if(!n){er.textContent='Enter the document name';return}
+ const keep=PD.old.filter(g=>!PD.rem.has(g.id));if(!keep.length&&!PD.pend.length){er.textContent='Add at least one page';return}
  const b=Q('#pv_ds');b.disabled=true;const added=[];
- try{for(let i=0;i<PD.pend.length;i++){er.textContent='Save ho raha hai… '+(i+1)+'/'+PD.pend.length;const r=await prep(PD.pend[i].f,sm),id=uid()+i;await putF(id,r.u8);const pgm={id,ty:r.ty,sz:r.u8.length};if(r.ty=='application/pdf'&&(PD.pend[i].en||await encPdf(PD.pend[i].f)))pgm.en=1;added.push(pgm)}
+ try{for(let i=0;i<PD.pend.length;i++){er.textContent='Saving… '+(i+1)+'/'+PD.pend.length;const r=await prep(PD.pend[i].f,sm),id=uid()+i;await putF(id,r.u8);const pgm={id,ty:r.ty,sz:r.u8.length};if(r.ty=='application/pdf'&&(PD.pend[i].en||await encPdf(PD.pend[i].f)))pgm.en=1;added.push(pgm)}
   er.textContent='';
   let d=PD.id?M.docs.find(x=>x.id==PD.id):null;
   if(!d){d={id:uid(),t:Date.now()};M.docs.push(d)}
@@ -2726,19 +2785,19 @@ async function dSave(){
   if(nc&&!catList().includes(nc))M.cats.push(nc);
   await saveM();for(const g of PD.old)if(PD.rem.has(g.id))await idel('blob',g.id);
   PD=null;cl();go()}
- catch(x){for(const g of added){try{await idel('blob',g.id)}catch(y){}}b.disabled=false;er.textContent='Save nahi hua: '+(x.message||x)}}
+ catch(x){for(const g of added){try{await idel('blob',g.id)}catch(y){}}b.disabled=false;er.textContent='Could not save: '+(x.message||x)}}
 
 /* ---- view / delete ---- */
 async function show(id){const d=M.docs.find(x=>x.id==id);if(!d)return;const p=M.persons.find(x=>x.id==d.pid);
- dg(`<h3>${E(d.n)}</h3><p class="mu">${E(p?p.n:'-')} · ${E(d.cat)}${expTag(d.exp)}</p>${d.note?`<p>${E(d.note)}</p>`:''}<div id="pv_vw"><p class="mu">Khul raha hai…</p></div><div class="row"><button type="button" onclick="PVT.exDlg(['${d.id}'])">PDF</button><button type="button" class="g" onclick="PVT.dForm('${d.id}')">Edit</button><button type="button" class="g" style="color:var(--bad)" onclick="PVT.dDel('${d.id}')">Delete</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`);
+ dg(`<h3>${E(d.n)}</h3><p class="mu">${E(p?p.n:'-')} · ${E(d.cat)}${expTag(d.exp)}</p>${d.note?`<p>${E(d.note)}</p>`:''}<div id="pv_vw"><p class="mu">Opening…</p></div><div class="row"><button type="button" class="pqb" onclick="PVT.exDlg(['${d.id}'])">${I('filedown')}PDF</button><button type="button" class="g pqb" onclick="PVT.dForm('${d.id}')">${I('pencil')}Edit</button><button type="button" class="g pqb" style="color:var(--bad)" onclick="PVT.dDel('${d.id}')">${I('trash')}Delete</button><button type="button" class="g pqb" onclick="PVT.cl()">${I('x')}Close</button></div>`);
  try{let h='';for(let i=0;i<d.pg.length;i++){const g=d.pg[i],u=await getF(g.id),b=new Blob([u],{type:g.ty}),url=URL.createObjectURL(b);urls.push(url);
-  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default;flex-wrap:wrap"><span>📄 PDF page ${i+1}${g.en?' 🔒':''}</span><button type="button" class="g" onclick="PVT.pgOut('${d.id}',${i})">Share / Save</button>${g.en?`<div style="width:100%"><input type="password" id="pv_vp${i}" placeholder="PDF ka password" autocomplete="off" style="margin:6px 0"><button type="button" onclick="PVT.unSaved('${d.id}',${i})">Password hatao</button> <span id="pv_vm${i}" class="mu"></span></div>`:''}</div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
-  const v=Q('#pv_vw');if(v)v.innerHTML=h}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Khul nahi paya: '+E(x.message||x)+'</p>'}}
+  h+=g.ty=='application/pdf'?`<div class="li" style="cursor:default;flex-wrap:wrap"><span class="pqb">${I('file')}PDF page ${i+1}${g.en?' '+I('lock','s'):''}</span><button type="button" class="g pqb pqs" onclick="PVT.pgOut('${d.id}',${i})">${I('share')}Share / Save</button>${g.en?`<div style="width:100%"><input type="password" id="pv_vp${i}" placeholder="PDF password" autocomplete="off" style="margin:6px 0"><button type="button" class="pqb" onclick="PVT.unSaved('${d.id}',${i})">${I('unlock')}Remove password</button> <span id="pv_vm${i}" class="mu"></span></div>`:''}</div>`:`<img src="${url}" style="width:100%;border-radius:10px;margin:6px 0;border:1px solid var(--br)">`}
+  const v=Q('#pv_vw');if(v)v.innerHTML=h}catch(x){const v=Q('#pv_vw');if(v)v.innerHTML='<p class="w">Could not open: '+E(x.message||x)+'</p>'}}
 const PJL=async()=>{await lib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'};
 async function rasterPdf(u8,pw,say){await PJL();let doc;
- try{doc=await pdfjsLib.getDocument({data:u8,password:pw}).promise}catch(x){throw new Error(x&&x.name=='PasswordException'?'Galat password':'PDF khul nahi paayi')}
+ try{doc=await pdfjsLib.getDocument({data:u8,password:pw}).promise}catch(x){throw new Error(x&&x.name=='PasswordException'?'Wrong password':'The PDF could not be opened')}
  const n=Math.min(doc.numPages,80),out=[];
- for(let k=1;k<=n;k++){say('Password hat raha hai… '+k+'/'+n);const pg=await doc.getPage(k),v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(3,2000/Math.max(v0.width,v0.height))}),c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:x,viewport:v}).promise;out.push(await new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Page convert nahi hua')),'image/jpeg',.85)));c.width=c.height=0}
+ for(let k=1;k<=n;k++){say('Removing password… '+k+'/'+n);const pg=await doc.getPage(k),v0=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(3,2000/Math.max(v0.width,v0.height))}),c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:x,viewport:v}).promise;out.push(await new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error('Page conversion failed')),'image/jpeg',.85)));c.width=c.height=0}
  return out}
 let QT=null;
 async function qpdfLoad(){if(QT)return QT;const B='https://cdn.jsdelivr.net/npm/pdfstudio@0.4.0/';
@@ -2746,25 +2805,25 @@ async function qpdfLoad(){if(QT)return QT;const B='https://cdn.jsdelivr.net/npm/
  for(const p of ['dist/qpdf.wasm','qpdf.wasm','dist/wasm/qpdf.wasm','src/wasm/qpdf.wasm']){try{const r=await fetch(B+p,{method:'HEAD'});if(r.ok){wu=B+p;break}}catch(x){}}
  const pdf=await mod.createPdfToolkit(wu?{wasmUrl:wu}:undefined);QT={pdf,Err:mod.PdfPasswordError};return QT}
 async function unlockText(u8,pw){let q;try{q=await qpdfLoad()}catch(x){const e=new Error('NOQ');e.noq=1;throw e}
- try{return await q.pdf.unlock(u8,{password:pw})}catch(x){if((q.Err&&x instanceof q.Err)||(x&&x.name==='PdfPasswordError')||/password/i.test(String(x&&x.message)))throw new Error('Galat password');const e=new Error('NOQ');e.noq=1;throw e}}
+ try{return await q.pdf.unlock(u8,{password:pw})}catch(x){if((q.Err&&x instanceof q.Err)||(x&&x.name==='PdfPasswordError')||/password/i.test(String(x&&x.message)))throw new Error('Wrong password');const e=new Error('NOQ');e.noq=1;throw e}}
 async function unPdf(i,photo){const p=PD&&PD.pend[i],inp=Q('#pv_pw'+i),say=t=>{const e=Q('#pv_pm'+i);if(e)e.textContent=t};if(!p||!inp)return;
- if(!inp.value){say('Password daalo');return}say('Khul raha hai…');
+ if(!inp.value){say('Enter the password');return}say('Opening…');
  try{const raw=new Uint8Array(await p.f.arrayBuffer()),nm=(p.f.name||'file').replace(/\.pdf$/i,'');
   if(photo){const bl=await rasterPdf(raw,inp.value,say);PD.pend.splice(i,1,...bl.map((b,k)=>({f:new File([b],nm+' - page '+(k+1)+'.jpg',{type:'image/jpeg'})})));plist();return}
   const u=await unlockText(raw,inp.value);PD.pend.splice(i,1,{f:new File([u],nm+'.pdf',{type:'application/pdf'}),un:1});plist()}
- catch(x){if(x&&x.noq){const e=Q('#pv_pm'+i);if(e)e.innerHTML='Text wala unlock load nahi hua (net check karo). <button type="button" class="g" onclick="PVT.unPdf('+i+',1)">Photo ki tarah convert karo</button>'}else say(x.message||String(x))}}
+ catch(x){if(x&&x.noq){const e=Q('#pv_pm'+i);if(e)e.innerHTML='Text-preserving unlock could not load (check your internet). <button type="button" class="g" onclick="PVT.unPdf('+i+',1)">Convert to photos</button>'}else say(x.message||String(x))}}
 async function unSaved(id,i,photo){const d=M.docs.find(x=>x.id==id),g=d&&d.pg[i],inp=Q('#pv_vp'+i),say=t=>{const e=Q('#pv_vm'+i);if(e)e.textContent=t};if(!g||!inp)return;
- if(!inp.value){say('Password daalo');return}say('Khul raha hai…');const added=[];
+ if(!inp.value){say('Enter the password');return}say('Opening…');const added=[];
  try{const raw=await getF(g.id);let outs;
   if(photo){outs=(await rasterPdf(raw,inp.value,say)).map(b=>({b,ty:'image/jpeg'}))}
   else{const u=await unlockText(raw,inp.value);outs=[{b:new Blob([u]),ty:'application/pdf'}]}
   for(let k=0;k<outs.length;k++){const u=new Uint8Array(await outs[k].b.arrayBuffer()),nid=uid()+k;await putF(nid,u);added.push({id:nid,ty:outs[k].ty,sz:u.length})}
   d.pg.splice(i,1,...added);await saveM();try{await idel('blob',g.id)}catch(x){}show(id)}
  catch(x){for(const a of added){try{await idel('blob',a.id)}catch(y){}}
-  if(x&&x.noq){const e=Q('#pv_vm'+i);if(e)e.innerHTML='Text wala unlock load nahi hua (net check karo). <button type="button" class="g" onclick="PVT.unSaved(\''+id+'\','+i+',1)">Photo ki tarah convert karo</button>'}else say(x.message||String(x))}}
+  if(x&&x.noq){const e=Q('#pv_vm'+i);if(e)e.innerHTML='Text-preserving unlock could not load (check your internet). <button type="button" class="g" onclick="PVT.unSaved(\''+id+'\','+i+',1)">Convert to photos</button>'}else say(x.message||String(x))}}
 async function pgOut(id,i){const d=M.docs.find(x=>x.id==id),g=d.pg[i];try{const u=await getF(g.id);LAST={name:fsn(d.n)+(g.ty=='application/pdf'?'.pdf':g.ty=='image/png'?'.png':'.jpg'),blob:new Blob([u],{type:g.ty})};await send()}catch(x){alert(x.message||x)}}
-async function dDel(id){const d=M.docs.find(x=>x.id==id);if(!d||!confirm(d.n+' delete karna hai?'))return;
- try{for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(x=>x.id!=id);st.sel.delete(id);await saveM();cl();go()}catch(x){alert('Delete nahi hua: '+(x.message||x))}}
+async function dDel(id){const d=M.docs.find(x=>x.id==id);if(!d||!confirm('Delete '+d.n+'?'))return;
+ try{for(const g of d.pg)await idel('blob',g.id);M.docs=M.docs.filter(x=>x.id!=id);st.sel.delete(id);await saveM();cl();go()}catch(x){alert('Could not delete: '+(x.message||x))}}
 
 /* ---- export PDF ---- */
 const fsn=s=>String(s).replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim()||'file';
@@ -2772,25 +2831,25 @@ const uq=(n,used)=>{let k=n,i=2;const m=/\.[^.]*$/.exec(n),ex=m&&m.index>0?m[0]:
 const fdate=()=>{const d=new Date(),M_=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(d.getDate()).padStart(2,'0')+M_[d.getMonth()]+d.getFullYear()};
 function exDlg(ids){
  exs=(ids||[...st.sel]).filter(id=>M.docs.some(d=>d.id==id));
- if(!exs.length){alert('Pehle documents select karo (tick karo)');return}
+ if(!exs.length){alert('Select some documents first (tick them)');return}
  dg(`<h3>Export PDF</h3><div id="pv_xl"></div>
-<label>Kaise<select id="pv_xm"><option value="one">Ek hi PDF</option><option value="many">Alag-alag PDF (ZIP me)</option></select></label>
-<label>Quality<select id="pv_xq"><option value="o">Original</option><option value="m" selected>Medium (chhoti file)</option><option value="s">Small (sabse chhoti)</option></select></label>
-<label style="display:flex;gap:10px;align-items:center"><input id="pv_x2" type="checkbox" style="width:auto;margin:0" checked> 2 page wale (Aadhaar Front+Back) ek A4 page par</label>
-<p id="pv_xe" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_xb" onclick="PVT.exRun()">PDF banao</button></div>`);
+<label>Mode<select id="pv_xm"><option value="one">Single PDF</option><option value="many">Separate PDFs (in a ZIP)</option></select></label>
+<label>Quality<select id="pv_xq"><option value="o">Original</option><option value="m" selected>Medium (smaller file)</option><option value="s">Small (smallest file)</option></select></label>
+<label style="display:flex;gap:10px;align-items:center"><input id="pv_x2" type="checkbox" style="width:auto;margin:0" checked> Put 2-page documents (Aadhaar Front+Back) on one A4 page</label>
+<p id="pv_xe" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_xb" onclick="PVT.exRun()">${I('filedown')}Create PDF</button></div>`);
  xl()}
-function xl(){const l=Q('#pv_xl');if(!l)return;l.innerHTML=exs.map((id,i)=>{const d=M.docs.find(x=>x.id==id),p=M.persons.find(x=>x.id==d.pid);return`<div class="li" style="cursor:default;padding:8px 0"><span style="min-width:0"><b>${i+1}. ${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${d.pg.length} page</span></span><span style="white-space:nowrap"><button type="button" class="g" onclick="PVT.xmv(${i},-1)">▲</button> <button type="button" class="g" onclick="PVT.xmv(${i},1)">▼</button></span></div>`}).join('')}
+function xl(){const l=Q('#pv_xl');if(!l)return;l.innerHTML=exs.map((id,i)=>{const d=M.docs.find(x=>x.id==id),p=M.persons.find(x=>x.id==d.pid),n=d.pg.length;return`<div class="li" style="cursor:default;padding:8px 0"><span style="min-width:0"><b>${i+1}. ${E(d.n)}</b><br><span class="mu">${E(p?p.n:'-')} · ${n} page${n==1?'':'s'}</span></span><span class="pqb" style="gap:4px"><button type="button" class="g pqb pqic" aria-label="Move up" onclick="PVT.xmv(${i},-1)">${I('up')}</button><button type="button" class="g pqb pqic" aria-label="Move down" onclick="PVT.xmv(${i},1)">${I('down')}</button></span></div>`}).join('')}
 const xmv=(i,n)=>{const j=i+n;if(j<0||j>=exs.length)return;[exs[i],exs[j]]=[exs[j],exs[i]];xl()};
 async function exRun(){
- const er=Q('#pv_xe'),b=Q('#pv_xb'),mode=Q('#pv_xm').value,ql=Q('#pv_xq').value,two=Q('#pv_x2').checked;b.disabled=true;er.textContent='Library load ho rahi hai…';
+ const er=Q('#pv_xe'),b=Q('#pv_xb'),mode=Q('#pv_xm').value,ql=Q('#pv_xq').value,two=Q('#pv_x2').checked;b.disabled=true;er.textContent='Loading library…';
  try{await PLL();const P=PDFLib.PDFDocument,W=595.28,H=841.89,G=28,docs=exs.map(id=>M.docs.find(x=>x.id==id)).filter(Boolean);
   const fit=(pg,im,x,y,w,h)=>{const s=Math.min(w/im.width,h/im.height),iw=im.width*s,ih=im.height*s;pg.drawImage(im,{x:x+(w-iw)/2,y:y+(h-ih)/2,width:iw,height:ih})};
   const emb=async(pdf,g)=>{let u=await getF(g.id);if(ql!='o'){const b=await jpegOf(new Blob([u],{type:g.ty}),ql=='m'?1600:1100,ql=='m'?.78:.6);u=new Uint8Array(await b.arrayBuffer());return pdf.embedJpg(u)}return g.ty=='image/png'?pdf.embedPng(u):pdf.embedJpg(u)};
   const extras=[];let done=0;const total=docs.reduce((a,d)=>a+d.pg.length,0);
   const addDoc=async(pdf,d)=>{const all=d.pg.length==2&&d.pg.every(g=>g.ty!='application/pdf');
-   if(two&&all){const a=await emb(pdf,d.pg[0]),c=await emb(pdf,d.pg[1]),pg=pdf.addPage([W,H]),h=H/2-G-8;fit(pg,a,G,H/2+8,W-2*G,h);fit(pg,c,G,G,W-2*G,h);done+=2;er.textContent='PDF ban rahi hai… '+done+'/'+total;return}
+   if(two&&all){const a=await emb(pdf,d.pg[0]),c=await emb(pdf,d.pg[1]),pg=pdf.addPage([W,H]),h=H/2-G-8;fit(pg,a,G,H/2+8,W-2*G,h);fit(pg,c,G,G,W-2*G,h);done+=2;er.textContent='Creating PDF… '+done+'/'+total;return}
    for(let gi=0;gi<d.pg.length;gi++){const g=d.pg[gi];if(g.ty=='application/pdf'){const raw=await getF(g.id);let ok=!g.en;if(ok){try{const src=await P.load(raw),cp=await pdf.copyPages(src,src.getPageIndices());cp.forEach(x=>pdf.addPage(x))}catch(x){ok=false}}if(!ok)extras.push({name:fsn(d0(d))+' - page '+(gi+1)+'.pdf',u:raw})}
-    else{const im=await emb(pdf,g),pg=pdf.addPage([W,H]);fit(pg,im,G,G,W-2*G,H-2*G)}done++;er.textContent='PDF ban rahi hai… '+done+'/'+total}};
+    else{const im=await emb(pdf,g),pg=pdf.addPage([W,H]);fit(pg,im,G,G,W-2*G,H-2*G)}done++;er.textContent='Creating PDF… '+done+'/'+total}};
   const nm=n=>fsn(n);
   if(mode=='one'||docs.length==1){const pdf=await P.create();for(const d of docs)await addDoc(pdf,d);const u=await pdf.save();
    if(extras.length){await JZL();const z=new JSZip(),used=new Set();if(pdf.getPageCount()>0)z.file(uq(nm(docs.length==1?d0(docs[0]):'PvtDocs-'+fdate())+'.pdf',used),u);extras.forEach(x=>z.file(uq(x.name,used),x.u));LAST={name:'PvtDocs-'+fdate()+'.zip',blob:await z.generateAsync({type:'blob',compression:'STORE'})}}
@@ -2799,70 +2858,70 @@ async function exRun(){
    extras.forEach(x=>z.file(uq(x.name,used),x.u));
    LAST={name:'PvtDocs-'+fdate()+'.zip',blob:await z.generateAsync({type:'blob',compression:'STORE'})}}
   const exN=extras.length;
-  dg(`<h3>PDF ready</h3><p class="mu">${E(LAST.name)} · ${MB(LAST.blob.size)}</p>${exN?`<p class="w">${exN} password wali PDF merge nahi hui, uski original file ZIP me alag hai.</p>`:''}<div class="row"><button type="button" onclick="PVT.send()">Share</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
- catch(x){b.disabled=false;er.textContent='PDF nahi bani: '+(x.message||x)}}
+  dg(`<h3>PDF ready</h3><p class="mu">${E(LAST.name)} · ${MB(LAST.blob.size)}</p>${exN?`<p class="w">${exN} password-protected PDF(s) could not be merged; the original file(s) are included separately in the ZIP.</p>`:''}<div class="row"><button type="button" onclick="PVT.send()">${I('share')}Share</button><button type="button" class="g" onclick="PVT.save()">${I('download')}Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
+ catch(x){b.disabled=false;er.textContent='Could not create PDF: '+(x.message||x)}}
 const d0=d=>{const p=M.persons.find(x=>x.id==d.pid);return(p?p.n+' - ':'')+d.n};
 
 /* ---- send / save a prepared file ---- */
 async function send(){if(!LAST)return;const{name,blob}=LAST;try{if(typeof NAT=='function'&&NAT()){await nativeShare(name,await b64(blob),false);return}
- const f=new File([blob],name,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return}save()}catch(x){if(x&&x.name==='AbortError')return;alert('Share nahi hua: '+(x.message||x))}}
+ const f=new File([blob],name,{type:blob.type});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return}save()}catch(x){if(x&&x.name==='AbortError')return;alert('Could not share: '+(x.message||x))}}
 function save(){if(!LAST)return;const a=document.createElement('a');a.href=URL.createObjectURL(LAST.blob);a.download=LAST.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
 
 /* ---- backup ---- */
 const manifest=()=>({v:1,persons:M.persons,cats:M.cats,docs:M.docs});
 async function mkZip(){await JZL();const z=new JSZip();z.file('data.json',JSON.stringify(manifest()));for(const d of M.docs)for(const g of d.pg)z.file('files/'+g.id,await getF(g.id));
  const u=await z.generateAsync({type:'uint8array',compression:'STORE'}),c=await seal(KEY,u),salt=s2b(meta().s),o=new Uint8Array(32+c.ct.length);o.set([80,86,84,49],0);o.set(salt,4);o.set(c.iv,20);o.set(c.ct,32);return new Blob([o],{type:'application/octet-stream'})}
-async function bkZip(){try{bkDone('PvtDocs-'+fdate()+'.pvz',await mkZip())}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
+async function bkZip(){try{bkDone('PvtDocs-'+fdate()+'.pvz',await mkZip())}catch(x){alert('Backup failed: '+(x.message||x))}}
 const CBK='bijli_pvt_cb';
 async function cloudUp(){const b=Q('#pv_cs');const say=t=>{if(b)b.textContent=t};
- try{say('Backup ban raha hai…');const blob=await mkZip();if(blob.size>52428800)throw new Error('Backup '+MB(blob.size)+' ka hai, cloud limit 50 MB hai. Phone me ZIP backup save karo.');
-  const t=await CLD.tok();say('Upload ho raha hai… '+MB(blob.size));
+ try{say('Creating backup…');const blob=await mkZip();if(blob.size>52428800)throw new Error('Backup is '+MB(blob.size)+', the cloud limit is 50 MB. Save a ZIP backup on the phone instead.');
+  const t=await CLD.tok();say('Uploading… '+MB(blob.size));
   const r=await fetch(t.url+'/storage/v1/object/pvt-docs/'+t.uid+'/latest.pvz',{method:'POST',headers:{apikey:t.key,Authorization:'Bearer '+t.at,'x-upsert':'true','Content-Type':'application/octet-stream'},body:blob});
   if(!r.ok){let j=null;try{j=await r.json()}catch(x){}throw new Error((j&&(j.message||j.error))||'HTTP '+r.status)}
-  const w=new Date().toLocaleString('en-IN');try{localStorage.setItem(CBK,w)}catch(x){}say('Cloud me save ho gaya ✓ '+w);const l=Q('#pv_cl');if(l)l.textContent='Aakhri cloud backup: '+w}
- catch(x){say('Cloud backup nahi hua: '+(x.message||x))}}
+  const w=new Date().toLocaleString('en-IN');try{localStorage.setItem(CBK,w)}catch(x){}say('Saved to cloud · '+w);const l=Q('#pv_cl');if(l)l.textContent='Last cloud backup: '+w}
+ catch(x){say('Cloud backup failed: '+(x.message||x))}}
 async function cloudDown(){const b=Q('#pv_cs');const say=t=>{if(b)b.textContent=t};
- try{say('Cloud se la raha hai…');const t=await CLD.tok();
+ try{say('Fetching from cloud…');const t=await CLD.tok();
   const r=await fetch(t.url+'/storage/v1/object/authenticated/pvt-docs/'+t.uid+'/latest.pvz',{headers:{apikey:t.key,Authorization:'Bearer '+t.at}});
-  if(r.status==400||r.status==404)throw new Error('Cloud me abhi koi backup nahi hai');if(!r.ok)throw new Error('HTTP '+r.status);
+  if(r.status==400||r.status==404)throw new Error('There is no backup in the cloud yet');if(!r.ok)throw new Error('HTTP '+r.status);
   const u=new Uint8Array(await r.arrayBuffer());say('');restBytes(u,'Cloud backup')}
- catch(x){say('Cloud restore nahi hua: '+(x.message||x))}}
-async function bkJson(){try{const tot=M.docs.reduce((a,d)=>a+d.pg.reduce((b,g)=>b+g.sz,0),0);if(tot*1.4>50e6&&!confirm('JSON backup lagbhag '+MB(tot*1.4)+' ka hoga aur phone me hang ho sakta hai. ZIP behtar hai. Phir bhi JSON banayein?'))return;
+ catch(x){say('Cloud restore failed: '+(x.message||x))}}
+async function bkJson(){try{const tot=M.docs.reduce((a,d)=>a+d.pg.reduce((b,g)=>b+g.sz,0),0);if(tot*1.4>50e6&&!confirm('The JSON backup will be about '+MB(tot*1.4)+' and may make the phone hang. ZIP is better. Create JSON anyway?'))return;
  const files={};for(const d of M.docs)for(const g of d.pg)files[g.id]=b2s(await getF(g.id));
  const m=manifest();m.files=files;const c=await seal(KEY,enc.encode(JSON.stringify(m)));
- bkDone('PvtDocs-'+fdate()+'.json',new Blob([JSON.stringify({pvt:1,s:meta().s,i:b2s(c.iv),c:b2s(c.ct)})],{type:'application/json'}))}catch(x){alert('Backup nahi bana: '+(x.message||x))}}
-function bkDone(name,blob){LAST={name,blob};dg(`<h3>Backup ready</h3><p class="mu">${E(name)} · ${MB(blob.size)}</p><p class="mu">Ise Drive ya WhatsApp me save kar lo. Restore ke waqt yahi PIN chahiye.</p><div class="row"><button type="button" onclick="PVT.send()">Share / Save</button><button type="button" class="g" onclick="PVT.save()">Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
+ bkDone('PvtDocs-'+fdate()+'.json',new Blob([JSON.stringify({pvt:1,s:meta().s,i:b2s(c.iv),c:b2s(c.ct)})],{type:'application/json'}))}catch(x){alert('Backup failed: '+(x.message||x))}}
+function bkDone(name,blob){LAST={name,blob};dg(`<h3>Backup ready</h3><p class="mu">${E(name)} · ${MB(blob.size)}</p><p class="mu">Save this to Drive or WhatsApp. You will need this same PIN when restoring.</p><div class="row"><button type="button" onclick="PVT.send()">${I('share')}Share / Save</button><button type="button" class="g" onclick="PVT.save()">${I('download')}Download</button><button type="button" class="g" onclick="PVT.cl()">Close</button></div>`)}
 
 /* ---- restore ---- */
-async function restPick(inp){const fl=inp.files&&inp.files[0];inp.value='';if(!fl)return;let u;try{u=new Uint8Array(await fl.arrayBuffer())}catch(x){alert('File padh nahi paya');return}restBytes(u,fl.name)}
+async function restPick(inp){const fl=inp.files&&inp.files[0];inp.value='';if(!fl)return;let u;try{u=new Uint8Array(await fl.arrayBuffer())}catch(x){alert('Could not read the file');return}restBytes(u,fl.name)}
 function restBytes(u,nm){
  try{
   if(u.length>48&&u[0]==80&&u[1]==86&&u[2]==84&&u[3]==49)RS={kind:'zip',salt:u.slice(4,20),iv:u.slice(20,32),ct:u.slice(32)};
   else{const o=JSON.parse(dec.decode(u));if(!o||o.pvt!==1)throw 0;RS={kind:'json',salt:s2b(o.s),iv:s2b(o.i),ct:s2b(o.c)}}}
- catch(x){RS=null;alert('Ye Pvt Documents ki backup file nahi lagti');return}
- dg(`<h3>Restore</h3><p class="mu">${E(nm)} (${RS.kind=='zip'?'ZIP':'JSON'} backup)</p><label>Backup ke waqt wala PIN<input id="pv_rp" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label>${KEY?`<label>Kaise<select id="pv_rm"><option value="merge">Merge (naye jud jayenge, purane waise hi)</option><option value="replace">Replace (sab kuch backup wala ho jayega)</option></select></label>`:''}<p id="pv_re" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_rb" onclick="PVT.restRun()">Restore</button></div>`)}
+ catch(x){RS=null;alert('This does not look like a Pvt Documents backup file');return}
+ dg(`<h3>Restore</h3><p class="mu">${E(nm)} (${RS.kind=='zip'?'ZIP':'JSON'} backup)</p><label>PIN used when the backup was made<input id="pv_rp" type="password" inputmode="numeric" maxlength="10" autocomplete="off"></label>${KEY?`<label>Mode<select id="pv_rm"><option value="merge">Merge (new items are added, existing stay as they are)</option><option value="replace">Replace (everything becomes what is in the backup)</option></select></label>`:''}<p id="pv_re" class="w"></p><div class="row"><button type="button" class="g" onclick="PVT.cl()">Cancel</button><button type="button" id="pv_rb" onclick="PVT.restRun()">${I('upload')}Restore</button></div>`)}
 async function restRun(){
  const er=Q('#pv_re'),b=Q('#pv_rb'),pin=Q('#pv_rp').value,mode=Q('#pv_rm')?Q('#pv_rm').value:'replace';
- if(!/^\d{4,10}$/.test(pin)){er.textContent='PIN daalo';return}
- b.disabled=true;er.textContent='Check ho raha hai…';let k,man,getB;
+ if(!/^\d{4,10}$/.test(pin)){er.textContent='Enter the PIN';return}
+ b.disabled=true;er.textContent='Checking…';let k,man,getB;
  try{k=await derive(pin,RS.salt);const pt=await unseal(k,RS.iv,RS.ct);
   if(RS.kind=='zip'){await JZL();const z=await JSZip.loadAsync(pt);man=JSON.parse(await z.file('data.json').async('string'));getB=async id=>z.file('files/'+id).async('uint8array');man._has=id=>!!z.file('files/'+id)}
   else{man=JSON.parse(dec.decode(pt));getB=async id=>s2b(man.files[id]);man._has=id=>typeof man.files[id]=='string'}
   if(!man||!Array.isArray(man.persons)||!Array.isArray(man.docs))throw new Error('x');
   for(const p of man.persons)if(!p||!IDR.test(String(p.id))||typeof p.n!='string')throw new Error('x');
   for(const d of man.docs){if(!d||!IDR.test(String(d.id))||!Array.isArray(d.pg)||typeof d.n!='string'||!d.pg.length)throw new Error('x');for(const g of d.pg)if(!g||!IDR.test(String(g.id))||!TYS.includes(g.ty)||!man._has(g.id))throw new Error('x')}
- }catch(x){b.disabled=false;er.textContent='Galat PIN ya file kharab hai. Kuch nahi badla.';return}
+ }catch(x){b.disabled=false;er.textContent='Wrong PIN or the file is damaged. Nothing was changed.';return}
  const prev=KEY,oldM=M;let added=0,dup=0;
  try{
   if(!prev){KEY=k;M={persons:[],cats:[],docs:[]};await iclr('blob')}
-  else if(mode=='replace'){if(!confirm('Abhi ka saara Pvt data hat kar backup wala aayega. Pakka?')){b.disabled=false;er.textContent='';return}}
+  else if(mode=='replace'){if(!confirm('All current Pvt data will be replaced by the backup. Are you sure?')){b.disabled=false;er.textContent='';return}}
   const tgt=(!prev||mode=='replace')?{persons:[],cats:[],docs:[]}:M,pm={},oldIds=new Set();
   if(prev&&mode=='replace')M.docs.forEach(d=>d.pg.forEach(g=>oldIds.add(g.id)));
   const fp=d=>[d.pid,d.cat,d.n.toLowerCase(),d.pg.reduce((a,g)=>a+(+g.sz||0),0)].join('|'),fps=new Set(tgt.docs.map(fp)),ids=new Set(tgt.docs.map(d=>d.id));
   for(const p of man.persons){let e=tgt.persons.find(x=>x.id==p.id)||tgt.persons.find(x=>x.n.toLowerCase()==p.n.toLowerCase());if(!e){e={id:p.id,n:p.n};tgt.persons.push(e)}pm[p.id]=e.id}
   (man.cats||[]).forEach(c=>{if(typeof c=='string'&&!tgt.cats.includes(c)&&!CATS.includes(c))tgt.cats.push(c)});
   let i=0;const newIds=new Set();
-  for(const d of man.docs){i++;er.textContent='Restore ho raha hai… '+i+'/'+man.docs.length;
+  for(const d of man.docs){i++;er.textContent='Restoring… '+i+'/'+man.docs.length;
    const nd={id:d.id,pid:pm[d.pid]||tgt.persons[0]&&tgt.persons[0].id||'',cat:String(d.cat||'Other'),n:d.n,note:String(d.note||''),exp:String(d.exp||''),t:+d.t||Date.now(),pg:d.pg.map(g=>g.en?{id:g.id,ty:g.ty,sz:+g.sz||0,en:1}:{id:g.id,ty:g.ty,sz:+g.sz||0})};
    if(!nd.pid){const p={id:uid(),n:'Other'};tgt.persons.push(p);nd.pid=p.id}
    if(ids.has(nd.id)||fps.has(fp(nd))){dup++;continue}
@@ -2872,8 +2931,8 @@ async function restRun(){
   if(prev&&mode=='replace')for(const id of oldIds)if(!newIds.has(id)){try{await idel('blob',id)}catch(x){}}
   if(!prev){await saveLock(RS.salt,k)}
   st.sel.clear();st.pid='';RS=null;touch();
-  dg(`<h3>Restore ho gaya ✓</h3><p>${added} document jude${dup?', '+dup+' duplicate chhode':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">Theek hai</button></div>`);go()}
- catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore beech me ruk gaya: '+(x.message||x)}}
+  dg(`<h3 class="pqh">${I('done')}Restore complete</h3><p>${added} document(s) added${dup?', '+dup+' duplicate(s) skipped':''}.</p><div class="row"><button type="button" onclick="PVT.cl();go()">OK</button></div>`);go()}
+ catch(x){if(!prev){KEY=null;M=null;try{await iclr('blob')}catch(y){}}else M=oldM;b.disabled=false;er.textContent='Restore stopped midway: '+(x.message||x)}}
 
 return{view,open,back,leave,on,idx,lock,setup,unlock,forgot,pick,search,tog,selAll,selNone,pForm,pSave,pDel,dForm,addF,rmP,rmOld,mvP,dSave,show,pgOut,dDel,exDlg,xmv,exRun,send,save,bkZip,bkJson,cloudUp,cloudDown,unPdf,unSaved,restPick,restRun,cl}
 })();
