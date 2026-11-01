@@ -1,6 +1,6 @@
 // Offline-first + auto-update: cache se turant khulta hai (net ke bina bhi),
 // peeche se net pe latest file download karke cache update karta hai.
-const C = 'bijli-v5';
+const C = 'bijli-v6';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 // Sirf ye CDN libraries (PDF, OCR, ZIP wale tools) cache hoti hain, taaki pehli baar chalne ke baad offline bhi chalein
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
