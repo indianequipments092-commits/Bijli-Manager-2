@@ -3119,6 +3119,7 @@ return{card,auth,copyKey,logout,push,pull,overwrite,setAuto,tick,startup,tok}
 /* text layer (select/copy) */
 .ptl{position:absolute;inset:0;overflow:hidden;line-height:1;text-align:initial;-webkit-text-size-adjust:none;text-size-adjust:none;pointer-events:auto;user-select:text;-webkit-user-select:text;-webkit-touch-callout:default;z-index:2}
 .ptl span,.ptl br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0 0;margin:0;padding:0;border:0;min-width:0;min-height:0;max-width:none;max-height:none;letter-spacing:normal;word-spacing:normal;text-indent:0;text-transform:none;font-weight:normal;font-style:normal;font-size-adjust:none}
+.ptli{position:absolute;left:0;top:0;transform-origin:0 0}
 .ptl .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:-1;cursor:default;user-select:none;-webkit-user-select:none}
 .ptl ::selection{background:rgba(0,110,255,.35);color:transparent}
 .pv .pvw.pvsm>.ptl{display:none!important}
@@ -3263,12 +3264,15 @@ function tlText(pg){let t=TLC.get(pg);if(!t){t=pg.getTextContent({normalizeWhite
 async function tlBuild(pg,vp,box,alive){
  try{if(box._t){try{box._t.cancel()}catch(e){}box._t=null}
   const tc=await tlText(pg);if(alive&&!alive())return'fail';
-  box.innerHTML='';box.style.setProperty('--scale-factor',vp.scale);
-  if(!tc.items.some(x=>x&&x.str&&x.str.trim()))return'none';
-  const dv=[],task=pdfjsLib.renderTextLayer({textContentSource:tc,container:box,viewport:vp,textDivs:dv});box._t=task;
+  box.innerHTML='';
+  let mn=1e9;for(const it of tc.items){if(!it||!it.str||!it.str.trim()||!it.transform)continue;const h=Math.hypot(it.transform[2],it.transform[3])*vp.scale;if(h>.3&&h<mn)mn=h}
+  if(mn==1e9)return'none';
+  /* Android WebView clamps tiny fonts (min ~8px) which makes boxes too big: build the layer F times bigger, then scale it back down */
+  const F=Math.max(1,Math.min(16,Math.ceil(16/mn))),vF=F>1?pg.getViewport({scale:vp.scale*F,rotation:vp.rotation}):vp,inn=document.createElement('div');
+  inn.className='ptli';inn.style.width=vF.width+'px';inn.style.height=vF.height+'px';if(F>1)inn.style.transform='scale('+(1/F)+')';inn.style.setProperty('--scale-factor',vF.scale);box.appendChild(inn);
+  const task=pdfjsLib.renderTextLayer({textContentSource:tc,container:inn,viewport:vF,textDivs:[]});box._t=task;
   await task.promise;box._t=null;if(alive&&!alive()){box.innerHTML='';return'fail'}
-  for(const sp of dv){const fs=parseFloat(sp.style.fontSize);if(!(fs>0))continue;const tr=sp.style.transform;sp.style.fontSize='100px';sp.style.lineHeight='1';sp.style.transform=(tr&&tr!='none'?tr+' ':'')+'scale('+(fs/100)+')'}
-  const e=document.createElement('div');e.className='endOfContent';box.appendChild(e);return'ok'}
+  const e=document.createElement('div');e.className='endOfContent';inn.appendChild(e);return'ok'}
  catch(er){return'fail'}}
 async function tlFit(pg,box,wr){
  const v=pg.getViewport({scale:1});box.style.width=v.width+'px';box.style.height=v.height+'px';box.style.left='0';box.style.top='0';box.style.transformOrigin='0 0';
