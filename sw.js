@@ -1,7 +1,7 @@
 // Offline-first + auto-update: cache se turant khulta hai (net ke bina bhi),
 // peeche se net pe latest file download karke cache update karta hai.
-const C = 'bijli-v16';
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const C = 'bijli-v17';
+const FILES = ['./', 'index.html', 'studyos.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 // Local pdf.js (repo ka pdfjs/ folder) - alag se add, taaki ek file na mile to baaki cache ho jayein
 const LOCAL_PDFJS = [
   'pdfjs/build/pdf.min.js',
@@ -28,44 +28,3 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== C).map(k => caches.delete(k))))
-      .then(() => clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  const u = new URL(e.request.url);
-
-  // CDN libraries: cache-first (version URL me hota hai, to badalti nahi)
-  if (LIB_HOSTS.includes(u.hostname)) {
-    e.respondWith(
-      caches.match(e.request).then(m => m || fetch(e.request).then(r => {
-        if (r && (r.ok || r.type === 'opaque')) {
-          const copy = r.clone();
-          caches.open(C).then(c => c.put(e.request, copy)).catch(() => {});
-        }
-        return r;
-      }))
-    );
-    return;
-  }
-
-  // Apni files: cache se turant, peeche se update
-  if (u.origin !== location.origin) return;
-  e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(m => {
-      const net = fetch(e.request).then(r => {
-        if (r && r.ok) {
-          const copy = r.clone();
-          caches.open(C).then(c => c.put(e.request, copy)).catch(() => {});
-        }
-        return r;
-      }).catch(() => m);
-      e.waitUntil(net.catch(() => {}));
-      return m || net;
-    })
-  );
-});
