@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 if(window.PDFEditor)return;
-const VERSION='0.5.2';
+const VERSION='0.5.3';
 const MB=1048576;
 
 /* ---------- Device / memory ---------- */
@@ -26,6 +26,8 @@ function idb(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);
 const req=q=>new Promise((ok,no)=>{q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)});
 const done=t=>new Promise((ok,no)=>{t.oncomplete=()=>ok();t.onerror=()=>no(t.error);t.onabort=()=>no(t.error||new Error('IndexedDB abort'))});
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+/* newId: objects ke liye id — pehle define hi nahi tha (19 jagah use hota hai), isliye alias. */
+const newId=uid;
 
 /* ---------- Working copy ----------
    create(blob,name) -> {id,mode,size,getBlob(),getBytes(),dispose()}
@@ -167,7 +169,7 @@ function start(ctx,host){
  function lab(){pin.value=st.page+1;pin.max=st.total;pnT.textContent='/ '+st.total;zv.textContent=Math.round(st.scale*100/ (st.base||1))+'%';
   root.querySelector('[data-a=prev]').disabled=st.page<=0;root.querySelector('[data-a=next]').disabled=st.page>=st.total-1}
  /* 100% = fit width: viewer jaisa; zoom % usi ke hisaab se */
- function lay(){const w=Math.round(st.pw*st.scale),h=Math.round(st.ph*st.scale);pg.style.width=w+'px';pg.style.height=h+'px';const c=pg.querySelector('canvas');c.style.width=w+'px';c.style.height=h+'px';if(typeof ovCv!=='undefined'){ovCv.style.width=w+'px';ovCv.style.height=h+'px'}lab()}
+ function lay(){const w=Math.round(st.pw*st.scale),h=Math.round(st.ph*st.scale);pg.style.width=w+'px';pg.style.height=h+'px';const c=pg.querySelector('canvas');c.style.width=w+'px';c.style.height=h+'px';if(typeof ovCv!=='undefined'){ovCv.style.width=w+'px';ovCv.style.height=h+'px'}lab();if(st.editUI)positionEditUI()}
  async function draw(){
   const pgo=st.pgObj;const rt=++st.rt;
   if(!pgo){ /* blank page: sirf safed page + overlay */
@@ -184,6 +186,7 @@ function start(ctx,host){
   if(rt!=st.rt)return;
   cv.style.width=pg.style.width;cv.style.height=pg.style.height;pg.appendChild(ovCv);drawOv();setBusy(0)}
  async function show(k,keep){
+  if(st.editUI)closeEdit(false); /* page badalte hi khula hua shabd-edit band (bina save) */
   k=clamp(k,0,st.pages.length-1);const t=++st.tk;st.page=k;lab();setBusy(1);updThumbs();
   if(st.dirty)scheduleAutoSave();
   const pgd=st.pages[k];
@@ -443,12 +446,14 @@ function start(ctx,host){
   window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up)}
  pg.addEventListener('pointerdown',ev=>{
   if(ev.pointerType==='mouse'&&ev.button!==0)return;
+  if(ev.target.closest('.pde-etbar,.pde-et')){ev.stopPropagation();return} /* inline edit UI par tap — page tool nahi */
   const r=pg.getBoundingClientRect(),px=(ev.clientX-r.left)/st.scale,py=(ev.clientY-r.top)/st.scale;
   if(st.tool==='select'){const o=hitTest(px,py);
    if(o){selectObj(o.id);ev.stopPropagation();startDrag(ev,px,py,o);return}
    selectObj(null);return}
   ev.stopPropagation();ev.preventDefault();
   if(st.tool==='text'){addTextAt(px,py);return}
+  if(st.tool==='edittext'){editTextAt(px,py);return}
   if(st.tool==='image'){toast('Image sheet se chuno — page ke beech me aa jayegi');return}
   if(st.subtool==='note'){addNoteAt(px,py);return}
   if(st.subtool==='erase'){const o=hitTest(px,py);if(o){pushHist();removeObj(o);markDirty(true);ensureWC();toast('Hata diya')}return}
@@ -457,12 +462,12 @@ function start(ctx,host){
   if(st.subtool&&st.subtool.indexOf('field-')===0){addFieldAt(px,py,st.subtool.slice(6));return}
   startDraw(ev,px,py)});
  /* ----- Tools rail ----- */
- const TOOLS=[['select','👆','Select'],['text','T','Text'],['image','🖼','Image'],['shape','▭','Shapes'],['ann','✎','Note'],['pages','📄','Pages'],['layers','☰','Layers'],['sign','✍','Sign'],['ocr','🔍','OCR'],['form','🧾','Form'],['redact','⬛','Redact'],['cmp','🆚','Compare'],['ai','🧠','AI']];
+ const TOOLS=[['select','👆','Select'],['text','T','Text'],['edittext','✏️','Edit Text'],['image','🖼','Image'],['shape','▭','Shapes'],['ann','✎','Note'],['pages','📄','Pages'],['layers','☰','Layers'],['sign','✍','Sign'],['ocr','🔍','OCR'],['form','🧾','Form'],['redact','⬛','Redact'],['cmp','🆚','Compare'],['ai','🧠','AI']];
  rail.innerHTML=TOOLS.map(t=>'<button class="pde-btn pde-tool'+(st.tool===t[0]?' on':'')+'" data-t="'+t[0]+'" title="'+t[2]+'"><span>'+t[1]+'</span><small>'+t[2]+'</small></button>').join('');
  rail.addEventListener('click',ev=>{const b=ev.target.closest('[data-t]');if(!b)return;setTool(b.dataset.t)});
- function setTool(t){st.tool=t;st.subtool=null;st.gesture=null;
+ function setTool(t){if(st.editUI&&t!==st.tool)closeEdit(false);st.tool=t;st.subtool=null;st.gesture=null;
   rail.querySelectorAll('.pde-tool').forEach(el=>el.classList.toggle('on',el.dataset.t===t));
-  if(t==='text')textSheet();else if(t==='image')imageSheet();else if(t==='shape')shapeSheet();else if(t==='ann')annSheet();else if(t==='pages')pagesSheet();
+  if(t==='text')textSheet();else if(t==='edittext')editTextSheet();else if(t==='image')imageSheet();else if(t==='shape')shapeSheet();else if(t==='ann')annSheet();else if(t==='pages')pagesSheet();
   else if(t==='layers')layersSheet();else if(t==='sign')signSheet();else if(t==='ocr')ocrSheet();else if(t==='form')formSheet();else if(t==='redact')redactSheet();else if(t==='cmp')compareSheet();else if(t==='ai')aiSheet();else sheetX();
   drawOv()}
  /* ----- Sheets ----- */
@@ -1101,6 +1106,183 @@ function start(ctx,host){
   const o={id:newId(),kind:'ovr',x:m.x,y:m.y,w:Math.max(30,m.w+4),h:m.h+4,txt:rep,size:Math.max(8,Math.round(m.h)),color:'#111111',opacity:1};
   st.pages[m.page].objs.push(o);F.matches.splice(F.idx,1);F.idx--;st.findHi=null;
   markDirty(true);ensureWC();show(m.page,1);toast('Overlay lag gaya — purana text dhaka hai, original nahi badla')}
+
+ /* ================= v0.5.3: Edit Text — PDFelement jaisa seedha shabd edit (server wala, asli) ================= */
+ /* Shabd par tap karo → wahi shabd type karne layak + floating toolbar (Bold/Italic/Size/Font/Rang).
+    Preview ke liye 'ovr' object banta hai (purana shabd dhaka + naya text), aur asli edit server par
+    PyMuPDF se hota hai (redact + insert) — Export par ya "Server se asli edit lagao" se.
+    Op 'ovr' object ke .textEdit me rehta hai, isliye undo/redo/draft ke saath chalta hai; object
+    hatane par op bhi hat jata hai. Sirf original PDF pages (src>=0) par; blank / jodi hui pages par nahi.
+    Server ko rect + baseline BOTTOM-LEFT origin (unrotated PDF points) me bheje jate hain — display
+    (rotated) coords sirf screen/overlay ke liye hain. */
+ st.editUI=null;st.etWarned=false;
+ const etTouch=matchMedia('(pointer:coarse)').matches;
+ const wordCache=new Map();
+ const etTa=document.createElement('textarea');etTa.className='pde-et';etTa.rows=1;etTa.spellcheck=false;etTa.setAttribute('aria-label','Shabd edit karo');etTa.style.display='none';pg.appendChild(etTa);
+ const etBar=document.createElement('div');etBar.className='pde-etbar';etBar.hidden=true;pg.appendChild(etBar);
+ etBar.innerHTML=etBarHtml();
+ bindEtBar(etBar);
+ etTa.addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();closeEdit(true)}
+  else if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closeEdit(false)}
+  else if((ev.ctrlKey||ev.metaKey)&&(ev.key==='b'||ev.key==='B')){ev.preventDefault();ev.stopPropagation();toggleEtFmt('bold')}
+  else if((ev.ctrlKey||ev.metaKey)&&(ev.key==='i'||ev.key==='I')){ev.preventDefault();ev.stopPropagation();toggleEtFmt('italic')}});
+ etTa.addEventListener('input',()=>{etTa.style.width=Math.max(90,Math.min(etTa.scrollWidth+12,(st.pw||600)*st.scale))+'px'});
+ function etBarHtml(){return '<button class="pde-btn" data-a="et-b" title="Bold (Ctrl+B)"><b>B</b></button>'+
+  '<button class="pde-btn" data-a="et-i" title="Italic (Ctrl+I)"><i>I</i></button>'+
+  '<button class="pde-btn" data-a="et-sminus" title="Chhota">−</button>'+
+  '<input type="number" class="pde-etsz" min="6" max="120" value="12" aria-label="Font size">'+
+  '<button class="pde-btn" data-a="et-splus" title="Bada">＋</button>'+
+  '<select class="pde-etf" aria-label="Font"><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="cursive">Cursive</option></select>'+
+  '<input type="color" class="pde-etc" value="#111111" aria-label="Rang">'+
+  '<button class="pde-btn pde-etdone" data-a="et-done">✓ Done</button>'+
+  '<button class="pde-btn" data-a="et-x" title="Radd (Esc)">✕</button>'}
+ function bindEtBar(c){if(!c)return;
+  const sz=c.querySelector('.pde-etsz');if(sz)sz.addEventListener('input',()=>{const e=st.editUI;if(!e)return;e.size=clamp(+sz.value||12,6,120);syncEtBar();positionEditUI()});
+  const f=c.querySelector('.pde-etf');if(f)f.addEventListener('change',()=>{const e=st.editUI;if(!e)return;e.fontKey=f.value;syncEtBar();positionEditUI()});
+  const col=c.querySelector('.pde-etc');if(col)col.addEventListener('input',()=>{const e=st.editUI;if(!e)return;e.color=col.value;syncEtBar();positionEditUI()})}
+ function fontCss(k){return k==='serif'?'serif':k==='mono'?'monospace':k==='cursive'?'cursive':'sans-serif'}
+ function syncEtBar(){const e=st.editUI;if(!e)return;
+  document.querySelectorAll('.pde-etbar,.pde-etsheet').forEach(c=>{const b=c.querySelector('[data-a="et-b"]');if(b)b.classList.toggle('on',!!e.bold);
+   const i=c.querySelector('[data-a="et-i"]');if(i)i.classList.toggle('on',!!e.italic);
+   const sz=c.querySelector('.pde-etsz');if(sz&&document.activeElement!==sz)sz.value=e.size;
+   const f=c.querySelector('.pde-etf');if(f)f.value=e.fontKey;
+   const col=c.querySelector('.pde-etc');if(col)col.value=e.color});
+  etTa.style.fontWeight=e.bold?'700':'400';etTa.style.fontStyle=e.italic?'italic':'normal';
+  etTa.style.color=e.color;etTa.style.fontFamily=fontCss(e.fontKey)}
+ function toggleEtFmt(k){const e=st.editUI;if(!e)return;if(k==='bold')e.bold=!e.bold;else e.italic=!e.italic;syncEtBar();positionEditUI();try{etTa.focus()}catch(err){}}
+ function etSizeStep(d){const e=st.editUI;if(!e)return;e.size=clamp(e.size+d,6,120);syncEtBar();positionEditUI();try{etTa.focus()}catch(err){}}
+ function positionEditUI(){const e=st.editUI;if(!e)return;const w=e.word;
+  const fsPx=Math.max(9,e.size*st.scale);
+  etTa.style.display='block';
+  etTa.style.left=Math.max(0,w.x*st.scale-2)+'px';
+  etTa.style.top=Math.max(0,w.y*st.scale-2)+'px';
+  etTa.style.width=Math.max(90,w.w*st.scale+28)+'px';
+  etTa.style.height=(fsPx*1.3+8)+'px';
+  etTa.style.fontSize=fsPx+'px';etTa.style.lineHeight='1.25';
+  if(etTouch||window.innerWidth<700){etBar.hidden=true;return}
+  etBar.hidden=false;
+  const bw=etBar.offsetWidth||380,bh=etBar.offsetHeight||48,px=w.x*st.scale,py=w.y*st.scale;
+  etBar.style.left=clamp(px,0,Math.max(0,st.pw*st.scale-bw))+'px';
+  etBar.style.top=(py-bh-8>=0?py-bh-8:py+w.h*st.scale+8)+'px'}
+ async function pageWords(pi){
+  const pgd=st.pages[pi];if(!pgd||pgd.src<0||pgd.ext)return null;
+  const key=pgd.src+':'+(pgd.rot||0);
+  if(wordCache.has(key))return wordCache.get(key);
+  const p=await getPdfPage(pi);if(!p)return null;
+  const tc=await p.getTextContent();
+  const v0=p.getViewport({scale:1}),W0=v0.width,H0=v0.height,words=[];
+  for(const it of tc.items){
+   if(!it.str||!it.str.trim())continue;
+   const tr=it.transform||[1,0,0,1,0,0];
+   const fs=Math.abs(tr[3])||Math.abs(tr[0])||12;
+   if(Math.abs(tr[1])>0.3*Math.abs(tr[0]||1))continue; /* tedha/vertical text — v1 me nahi */
+   const fullW=it.width||it.str.length*fs*0.5,s=it.str;
+   /* Shabd ki sahi jagah: har akshar barabar chauda nahi hota — uniform char width se
+      24pt par ~8pt galat padta hai (shabd shift ho jata hai, purana akshar dikhta rehta hai).
+      Canvas measureText se prefix ka ratio nikalo aur asli item width par lagao (~2pt error). */
+   const mc=pageWords._c||(pageWords._c=document.createElement('canvas').getContext('2d'));
+   mc.font=(/italic|oblique/i.test(it.fontName||'')?'italic ':'')+(/bold|black|heavy/i.test(it.fontName||'')?'bold ':'')+fs+'px sans-serif';
+   const fullM=mc.measureText(s).width||fullW;
+   let m;const re=/\S+/g;
+   while((m=re.exec(s))){
+    const wStr=m[0],off=m.index;
+    const f0=mc.measureText(s.slice(0,off)).width/fullM,f1=mc.measureText(s.slice(0,off+wStr.length)).width/fullM;
+    const ux0=tr[4]+f0*fullW,ux1=tr[4]+f1*fullW,uyTop=H0-tr[5]-fs;
+    const d0=rotPt(ux0,uyTop,pgd.rot||0,W0,H0),d1=rotPt(ux1,uyTop+fs,pgd.rot||0,W0,H0);
+    const dx=Math.min(d0[0],d1[0]),dy=Math.min(d0[1],d1[1]);
+    words.push({text:wStr,font:it.fontName||'',
+     x:dx,y:dy,w:Math.max(2,Math.abs(d1[0]-d0[0])),h:Math.max(2,Math.abs(d1[1]-d0[1])),
+     px0:ux0,px1:ux1,baseY:tr[5],fs:fs})}}
+  const rec={words:words};wordCache.set(key,rec);return rec}
+ async function editTextAt(px,py){
+  const pgd=curPg();
+  if(pgd.src<0){toast('Blank page par word edit nahi hota');return}
+  if(pgd.ext){toast('Jodi hui PDF ke page par asli edit nahi hota');return}
+  if(st.editUI)closeEdit(false);
+  let rec=null;try{rec=await pageWords(st.page)}catch(e){toast('Shabd nahi mile: '+(e&&e.message||e));return}
+  if(!rec||!rec.words.length){toast('Is page me selectable text nahi hai (scan ho sakti hai)');return}
+  let best=null,bd=1e9;
+  for(const w of rec.words){if(px>=w.x-4&&px<=w.x+w.w+4&&py>=w.y-4&&py<=w.y+w.h+4){const a=w.w*w.h;if(a<bd){bd=a;best=w}}}
+  if(!best){for(const w of rec.words){const d=Math.hypot(px-(w.x+w.w/2),py-(w.y+w.h/2));if(d<15&&d<bd){bd=d;best=w}}}
+  if(!best){toast('Is jagah koi shabd nahi — shabd par tap karo');return}
+  openEdit(best)}
+ function openEdit(w){
+  st.editUI={word:w,txt:w.text,size:Math.max(6,Math.round(w.fs)),bold:/bold|black|heavy/i.test(w.font||''),italic:/italic|oblique/i.test(w.font||''),color:'#111111',fontKey:'sans'};
+  etTa.value=w.text;sheetX();positionEditUI();syncEtBar();
+  if(etTouch||window.innerWidth<700){
+   sheet('<div class="pde-inf"><b>Shabd edit karo</b><p>Neeche se Bold / Italic / Size / Font / Rang badlo, phir Done dabao. Naya text lamba ho to aage badh jayega (line nahi badalti).</p></div><div class="pde-etsheet">'+etBarHtml()+'</div>');
+   bindEtBar(shb.querySelector('.pde-etsheet'));syncEtBar()}
+  setTimeout(()=>{try{etTa.focus();etTa.select()}catch(e){}},30)}
+ function closeEdit(save){
+  const e=st.editUI;if(!e)return;
+  if(save){commitEdit();return}
+  st.editUI=null;etTa.style.display='none';etBar.hidden=true;sheetX()}
+ function commitEdit(){
+  const e=st.editUI;if(!e)return;
+  const nt=etTa.value.replace(/\s+/g,' ').trim();
+  st.editUI=null;etTa.style.display='none';etBar.hidden=true;sheetX();
+  if(!nt||nt===e.word.text)return;
+  const w=e.word,pgd=curPg();
+  pushHist();
+  const mc=commitEdit._c||(commitEdit._c=document.createElement('canvas').getContext('2d'));
+  mc.font=(e.italic?'italic ':'')+(e.bold?'bold ':'')+e.size+'px sans-serif';
+  const nw=Math.max(w.w,mc.measureText(nt).width+4);
+  const baseY=w.y+w.h; /* display baseline (top-left origin) */
+  const o={id:newId(),kind:'ovr',x:w.x-1,y:baseY-1.125*e.size,w:nw+2,h:1.5*e.size,txt:nt,size:e.size,color:e.color,bold:e.bold,italic:e.italic,align:'left',opacity:1,
+   textEdit:{page:pgd.src,rect:[w.px0,w.baseY-0.25*w.fs,w.px1,w.baseY+0.8*w.fs],baseline:[w.px0,w.baseY],oldText:w.text,fontKey:e.fontKey}};
+  curObjs().push(o);markDirty(true);ensureWC();selectObj(o.id);drawOv();
+  toast('Preview lag gaya — Export par asli edit server se lagega')}
+ function editTextSheet(){
+  const n=collectTextEdits().length,srv=aiServerOk();
+  if(!srv&&!st.etWarned){st.etWarned=true;toast('Server set nahi hai — asli edit ke liye main app me Server settings kholo (URL + token). Abhi sirf preview edit hoga.')}
+  sheet('<div class="pde-inf"><b>Edit Text — seedha shabd edit</b><p>Kisi shabd par tap karo — wahi shabd edit hoga, aur paas me Bold / Italic / Size / Font / Rang ka menu khulega. PDFelement PC jaisa.</p>'+
+  (srv?'<p class="pde-mu">Server connected hai ('+esc(aiServerHost())+') — Done par asli edit server se lagega.</p>':'<p class="pde-mu" style="color:#ff9d5c">⚠ Server set nahi hai — abhi sirf preview edit hoga (shabd dhak kar naya text dikhega). Asli edit ke liye main app me Server settings kholo aur URL + token daalo.</p>')+
+  '<p class="pde-mu">Pending asli edits: '+n+'. Ek shabd ek baar me badlo; naya text lamba ho to aage badh jayega (line nahi badalti). Sirf original PDF pages par — blank ya jodi hui PDF ke pages par nahi.</p>'+
+  (n?'<button class="pde-btn" data-a="et-apply">Server se asli edit lagao ('+n+')</button>':'')+'</div>')}
+ function collectTextEdits(){const out=[];
+  st.pages.forEach(pgd=>{if(pgd.src<0)return;
+   flatObjs(pgd.objs).forEach(o=>{if(o.kind==='ovr'&&o.textEdit&&o.txt&&String(o.txt).trim()){
+    const te=o.textEdit;
+    out.push({obj:o,page:te.page,rect:te.rect,baseline:te.baseline,oldText:te.oldText||'',newText:String(o.txt),fontSize:o.size||12,bold:!!o.bold,italic:!!o.italic,color:o.color||'#111111',font:te.fontKey||'sans'})}})});
+  return out}
+ async function reloadOwnDoc(u8){
+  st.fileBytes=u8;
+  if(st.ownDoc){try{st.ownDoc.destroy()}catch(e){}}st.ownDoc=null;
+  st.ownDocP=(async()=>{try{
+   if(!window.pdfjsLib&&host&&typeof host.PJ==='function'){try{await host.PJ()}catch(e){}}
+   if(!window.pdfjsLib)return null;
+   const d=await window.pdfjsLib.getDocument({data:u8.slice()}).promise;
+   st.ownDoc=d;return d}catch(e){return null}})();
+  wordCache.clear();thCache.clear();st.aiTxt=null;
+  await show(st.page,1)}
+ async function applyTextEdits(opts){
+  opts=opts||{};
+  const ops=collectTextEdits();
+  if(!ops.length){if(!opts.quiet)toast('Koi text edit nahi hai');return 0}
+  if(!aiServerOk()){if(!opts.quiet)toast('Server set nahi hai — asli edit ke liye main app me Server settings kholo (URL + token). Preview overlay se export hoga.');return -1}
+  try{
+   let bytes=null;if(st.wc)bytes=await st.wc.getBytes();else if(ctx.file)bytes=new Uint8Array(await ctx.file.arrayBuffer());
+   if(!bytes||!bytes.length)throw new Error('PDF bytes nahi mile');
+   const fd=new FormData();fd.append('file',new Blob([bytes],{type:'application/pdf'}),ctx.name||'PDF.pdf');
+   fd.append('ops',JSON.stringify(ops.map(o=>({page:o.page,rect:o.rect,baseline:o.baseline,oldText:o.oldText,newText:o.newText,fontSize:o.fontSize,bold:o.bold,italic:o.italic,color:o.color,font:o.font}))));
+   const r=await window.srFetch('/v1/pdf-edit-text',{method:'POST',body:fd},240000);
+   const out=new Uint8Array(await r.arrayBuffer());
+   if(!out.length)throw new Error('Server ne khali file di');
+   const note=r.headers.get('X-PDFEdit-Note');
+   const oldWc=st.wc;st.wc=null;st.wcTried=false;
+   st.wc=await createCopy(new Blob([out],{type:'application/pdf'}),ctx.name||'PDF');
+   if(oldWc){try{await oldWc.dispose()}catch(e){}}
+   /* preview objects hatao — page ab asli edited hai; display dobara load karo */
+   pushHist();
+   const stripTe=list=>{for(let i=list.length-1;i>=0;i--){const o=list[i];if(o.kind==='group')stripTe(o.children||[]);else if(o.kind==='ovr'&&o.textEdit&&ops.some(x=>x.obj===o))list.splice(i,1)}};
+   st.pages.forEach(pgd=>stripTe(pgd.objs));
+   st.sel=null;renderProps();
+   await reloadOwnDoc(out);
+   markDirty(true);
+   toast('Asli edit lag gaya ✓ ('+ops.length+' shabd)'+(note?' — '+note:''));
+   return ops.length}
+  catch(e){toast('Asli edit nahi laga: '+(e&&e.message||e)+' — preview overlay se export hoga');return -1}}
  /* ----- Properties panel ----- */
  function renderProps(){const o=st.sel?findObj(st.sel):null;
   if(!o){props.innerHTML='';return}
@@ -1389,6 +1571,8 @@ function start(ctx,host){
   setBusy(1);
   try{
    await host.PL();const F=window.PDFLib;if(!F)throw new Error('PDFLib nahi mili');
+   /* v0.5.3: pehle asli text edits server se lagao (working copy badal jati hai); na lage to overlay se export hoga */
+   if(collectTextEdits().length){await applyTextEdits();setBusy(1)}
    let bytes=null;
    if(st.wc)bytes=await st.wc.getBytes();
    else if(ctx.file)bytes=new Uint8Array(await ctx.file.arrayBuffer());
@@ -1474,6 +1658,13 @@ function start(ctx,host){
   else if(a=='un')doUndo();else if(a=='re')doRedo();else if(a=='sv')saveDraft();else if(a=='ex')exportSheet();
   else if(a=='tb'){st.defT.bold=!st.defT.bold;b.classList.toggle('on',st.defT.bold)}
   else if(a=='ti'){st.defT.italic=!st.defT.italic;b.classList.toggle('on',st.defT.italic)}
+  else if(a=='et-b')toggleEtFmt('bold');
+  else if(a=='et-i')toggleEtFmt('italic');
+  else if(a=='et-sminus')etSizeStep(-1);
+  else if(a=='et-splus')etSizeStep(1);
+  else if(a=='et-done')closeEdit(true);
+  else if(a=='et-x')closeEdit(false);
+  else if(a=='et-apply'){sheetX();applyTextEdits()}
   else if(a=='fnd')findRun((q('#pde-fq')||{}).value||'');
   else if(a=='fnp')findGo(-1);else if(a=='fnn')findGo(1);else if(a=='frp')findReplace();
   else if(a=='im-add'){st.replacing=false;imgIn.click()}
@@ -1577,6 +1768,7 @@ function start(ctx,host){
   if(S!==st)return;const tg=e.target;if(tg&&(tg.tagName=='INPUT'||tg.tagName=='TEXTAREA'||tg.isContentEditable))return;
   const k=e.key,ct=e.ctrlKey||e.metaKey;let h=1;
   if(!sh.hidden&&k=='Escape')sheetX();
+  else if(k=='Escape'&&st.editUI){closeEdit(false);h=1}
   else if(k=='Escape')back();
   else if(k=='PageDown')show(st.page+1,1);else if(k=='PageUp')show(st.page-1,1);
   else if(k=='Home'&&ct)show(0,1);else if(k=='End'&&ct)show(st.total-1,1);
@@ -1584,6 +1776,8 @@ function start(ctx,host){
   else if(ct&&(k==='z'||k==='Z')){if(e.shiftKey)doRedo();else doUndo()}
   else if(ct&&(k==='y'||k==='Y'))doRedo();
   else if(ct&&(k==='s'||k==='S'))saveDraft();
+  else if(ct&&(k==='b'||k==='B')&&st.editUI){toggleEtFmt('bold');h=1}
+  else if(ct&&(k==='i'||k==='I')&&st.editUI){toggleEtFmt('italic');h=1}
   else if((k==='Delete'||k==='Backspace')&&st.sel){const o=findObj(st.sel);if(o){pushHist();removeObj(o);markDirty(true);ensureWC()}}
   else h=0;
   if(h||ct&&(k=='+'||k=='-'||k=='='||k=='0'))e.preventDefault();

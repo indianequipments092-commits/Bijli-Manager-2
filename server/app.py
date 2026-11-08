@@ -9,6 +9,7 @@ Endpoints (sab POST multipart, field "file"; Authorization: Bearer <API_TOKEN>):
   POST /v1/office-to-pdf
   POST /v1/pdf-protect      form: password
   POST /v1/pdf-unprotect    form: password
+  POST /v1/pdf-edit-text    multipart: file + ops (JSON) -> edited PDF (asli word edit, PyMuPDF)
   POST /v1/ai/summarize     JSON: text, lang(hi|en|hinglish), style(short|points|detailed)  -> {text}
   POST /v1/ai/ask           JSON: text, question, lang                                       -> {text}
   POST /v1/ai/translate     JSON: text, to(hi|en)                                            -> {text}
@@ -21,6 +22,13 @@ from flask import Flask, request, jsonify, Response, g
 from werkzeug.exceptions import RequestEntityTooLarge, HTTPException
 import pikepdf
 import pdfplumber
+try:
+    import pymupdf as fitz  # PyMuPDF 2.x (naya naam); purana `import fitz` deprecated hai
+except ImportError:
+    try:
+        import fitz
+    except ImportError:
+        fitz = None
 from docx import Document
 from docx.shared import Pt, Inches
 from openpyxl import Workbook
@@ -70,7 +78,7 @@ def _after(resp):
         resp.headers["Vary"] = "Origin"
         resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        resp.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
+        resp.headers["Access-Control-Expose-Headers"] = "Content-Disposition, X-PDFEdit-Applied, X-PDFEdit-Skipped, X-PDFEdit-Note"
         resp.headers["Access-Control-Max-Age"] = "600"
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -425,7 +433,8 @@ def office_to_pdf(src, d):
 @app.get("/health")
 def health():
     return jsonify(ok=True, version=1, max_mb=MAX_MB, max_pages=MAX_PAGES,
-                   libreoffice=bool(shutil.which(SOFFICE)), poppler=bool(shutil.which("pdftoppm")), ai=bool(AI_KEY))
+                   libreoffice=bool(shutil.which(SOFFICE)), poppler=bool(shutil.which("pdftoppm")), ai=bool(AI_KEY),
+                   pymupdf=bool(fitz))
 
 
 @app.post("/v1/pdf-to-docx")
@@ -503,6 +512,158 @@ def r_unprotect():
         except pikepdf.PdfError:
             raise ApiError("PDF kharab hai ya khul nahi rahi.", 400)
         return send(dst, "application/pdf", "unlocked.pdf")
+
+
+# ---------- PDF Edit Text (asli word edit, v0.5.3) ----------
+# Client (PDF Editor Pro) har op bhejta hai:
+#   {page (0-based, ORIGINAL pdf), rect [x0,y0,x1,y1] (PDF points, unrotated, BOTTOM-LEFT origin),
+#    baseline [x,y] (wahi origin), oldText, newText, fontSize, bold, italic, color (#rrggbb),
+#    font ('sans'|'serif'|'mono'|'cursive')}
+# Server: purana shabd redact karke (sach me hatakar) naya text insert karta hai.
+# Coordinates fitz ke top-left origin me badle jate hain (y = pageHeight - y_bl).
+# Devanagari: PyMuPDF complex-script shaping NAHI karta (HarfBuzz nahi) — conjuncts/matras
+# toot sakte hain. Isliye Hindi text font file se likha jata hai, note header me aata hai.
+_DEVA_RE = re.compile(r"[\u0900-\u097F]")
+_BASE_FONT = {
+    ("sans", False, False): "helv", ("sans", True, False): "heit",
+    ("sans", False, True): "heoi", ("sans", True, True): "hebo",
+    ("serif", False, False): "tiro", ("serif", True, False): "tibo",
+    ("serif", False, True): "tiit", ("serif", True, True): "tibi",
+    ("mono", False, False): "cour", ("mono", True, False): "coob",
+    ("mono", False, True): "cooi", ("mono", True, True): "cobo",
+}
+
+
+def _deva_font():
+    for p in (os.environ.get("DEVANAGARI_FONT", ""),
+              "/app/fonts/NotoSansDevanagari-Regular.ttf",
+              "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+              "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf"):
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
+def _hex_rgb(h):
+    m = re.match(r"^#?([0-9a-f]{6})$", (h or "").strip(), re.I)
+    if not m:
+        return (0, 0, 0)
+    n = int(m.group(1), 16)
+    return ((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255)
+
+
+def _validate_ops(raw, n_pages):
+    if not isinstance(raw, list) or not raw:
+        raise ApiError("ops khali hai ya list nahi hai.", 400)
+    if len(raw) > 200:
+        raise ApiError("Ek baar me 200 se zyada edits nahi.", 400)
+    ops = []
+    for i, o in enumerate(raw):
+        if not isinstance(o, dict):
+            raise ApiError("Op %d galat hai." % (i + 1), 400)
+        pg = o.get("page")
+        if not isinstance(pg, int) or isinstance(pg, bool) or pg < 0 or pg >= n_pages:
+            raise ApiError("Op %d: page galat hai." % (i + 1), 400)
+        rect = o.get("rect")
+        if (not isinstance(rect, (list, tuple)) or len(rect) != 4
+                or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in rect)):
+            raise ApiError("Op %d: rect galat hai." % (i + 1), 400)
+        base = o.get("baseline")
+        if (not isinstance(base, (list, tuple)) or len(base) != 2
+                or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in base)):
+            raise ApiError("Op %d: baseline galat hai." % (i + 1), 400)
+        nt = o.get("newText")
+        if not isinstance(nt, str) or not nt.strip() or len(nt) > 500:
+            raise ApiError("Op %d: naya text khali ya bahut bada hai." % (i + 1), 400)
+        fs = o.get("fontSize")
+        if not isinstance(fs, (int, float)) or isinstance(fs, bool) or not 4 <= fs <= 200:
+            raise ApiError("Op %d: fontSize galat hai." % (i + 1), 400)
+        ops.append({
+            "page": pg,
+            "rect": [float(v) for v in rect],
+            "baseline": [float(v) for v in base],
+            "oldText": clean(o.get("oldText") or "")[:500],
+            "newText": clean(nt),
+            "fontSize": float(fs),
+            "bold": bool(o.get("bold")),
+            "italic": bool(o.get("italic")),
+            "color": o.get("color") or "#111111",
+            "font": o.get("font") if o.get("font") in ("sans", "serif", "mono", "cursive") else "sans",
+        })
+    return ops
+
+
+def pdf_edit_text(src, dst, ops):
+    if fitz is None:
+        raise ApiError("Server par PyMuPDF install nahi hai.", 501)
+    deva = _deva_font()
+    doc = fitz.open(src)
+    try:
+        by_page = {}
+        for o in ops:
+            by_page.setdefault(o["page"], []).append(o)
+        applied, skipped, notes = 0, 0, []
+        for pi in sorted(by_page):
+            page = doc[pi]
+            H = page.rect.height
+            group = by_page[pi]
+            # 1) purana shabd hatao: pehle saare rects mark karo, phir ek baar me apply
+            for o in group:
+                x0, y0, x1, y1 = o["rect"]
+                page.add_redact_annot(fitz.Rect(x0 - 1, H - y1 - 1, x1 + 1, H - y0 + 1))
+            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE,
+                                  graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+                                  text=fitz.PDF_REDACT_TEXT_REMOVE)
+            # 2) naya text baseline par daalo
+            for o in group:
+                bx, by = o["baseline"]
+                pt = fitz.Point(bx, H - by)
+                rgb = _hex_rgb(o["color"])
+                fn = _BASE_FONT[(o["font"], o["bold"], o["italic"])]
+                try:
+                    if _DEVA_RE.search(o["newText"]) and deva:
+                        tw = fitz.TextWriter(page.rect)
+                        tw.append(pt, o["newText"], font=fitz.Font(fontfile=deva), fontsize=o["fontSize"])
+                        tw.write_text(page, color=rgb)
+                        notes.append("page %d: Hindi text Devanagari font se likha (shaping poora nahi ho sakta)" % (pi + 1))
+                    else:
+                        if _DEVA_RE.search(o["newText"]):
+                            notes.append("page %d: Hindi font nahi mila, Helvetica se likha (akshar toot sakte hain)" % (pi + 1))
+                        page.insert_text(pt, o["newText"], fontsize=o["fontSize"], fontname=fn, color=rgb)
+                    applied += 1
+                except Exception as ex:
+                    log.warning("pdf-edit-text op skip (page %d): %s", pi + 1, ex)
+                    skipped += 1
+        doc.save(dst, garbage=3, deflate=True)
+    finally:
+        doc.close()
+    return applied, skipped, notes
+
+
+@app.post("/v1/pdf-edit-text")
+def r_pdf_edit_text():
+    raw = request.form.get("ops", "")
+    try:
+        ops_raw = json.loads(raw) if raw else None
+    except ValueError:
+        raise ApiError("ops JSON samajh nahi aaya.", 400)
+    with job() as d:
+        src = get_upload(d, {"pdf"})
+        n = check_pdf(src)
+        ops = _validate_ops(ops_raw, n)
+        dst = os.path.join(d, "out.pdf")
+        applied, skipped, notes = pdf_edit_text(src, dst, ops)
+        if skipped:
+            notes.append("%d edit skip hue (server log dekho)" % skipped)
+        with open(dst, "rb") as fh:
+            data = fh.read()
+        resp = Response(data, mimetype="application/pdf",
+                        headers={"Content-Disposition": 'attachment; filename="edited.pdf"',
+                                 "X-PDFEdit-Applied": str(applied),
+                                 "X-PDFEdit-Skipped": str(skipped)})
+        if notes:
+            resp.headers["X-PDFEdit-Note"] = "; ".join(notes)[:500]
+        return resp
 
 
 # ---------- AI (Google Gemini API). Key sirf server par rehti hai: Render > Environment > GEMINI_API_KEY ----------

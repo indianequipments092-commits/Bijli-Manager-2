@@ -102,3 +102,18 @@
 .pde-th.on canvas{border-color:var(--ac)}
 .pde-th small{display:block;font-size:10px;color:var(--mu);margin-top:2px}
 .pde-th.on small{color:var(--tx);font-weight:700}
+/* ===== v0.5.3: Edit Text — inline shabd edit (textarea + floating toolbar) ===== */
+.pde-ov{z-index:1}
+.pde-et{position:absolute;z-index:2;display:none;resize:none;overflow:hidden;white-space:nowrap;background:rgba(255,255,255,.93);color:#111;border:2px solid var(--ac);border-radius:6px;padding:0 4px;margin:0;outline:none;user-select:text;-webkit-user-select:text;box-shadow:0 2px 10px #0006}
+.pde-etbar{position:absolute;z-index:3;display:flex;gap:4px;align-items:center;background:var(--pn);border:1px solid var(--br);border-radius:12px;padding:6px;box-shadow:0 4px 18px #0008;max-width:calc(100% - 8px);flex-wrap:wrap}
+.pde-etbar[hidden]{display:none}
+.pde-etbar .pde-btn{min-height:40px;min-width:40px;padding:0 8px}
+.pde-etbar .pde-etsz{width:56px;min-height:40px;border-radius:10px;border:1px solid var(--br);background:var(--bt);color:var(--tx);text-align:center;font:inherit}
+.pde-etbar .pde-etf{min-height:40px;border-radius:10px;border:1px solid var(--br);background:var(--bt);color:var(--tx);font:inherit;padding:0 6px;max-width:110px}
+.pde-etbar .pde-etc{width:40px;height:40px;padding:2px;border-radius:10px;border:1px solid var(--br);background:var(--bt)}
+.pde-root .pde-etbar .pde-etdone,.pde-root .pde-etsheet .pde-etdone{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pde-etsheet{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.pde-etsheet .pde-btn{min-height:44px}
+.pde-etsheet .pde-etsz{width:60px;min-height:44px;border-radius:10px;border:1px solid var(--br);background:var(--bt);color:var(--tx);text-align:center;font:inherit}
+.pde-etsheet .pde-etf{min-height:44px;border-radius:10px;border:1px solid var(--br);background:var(--bt);color:var(--tx);font:inherit;padding:0 6px}
+.pde-etsheet .pde-etc{width:44px;height:44px;padding:2px;border-radius:10px;border:1px solid var(--br);background:var(--bt)}
