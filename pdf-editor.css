@@ -5,6 +5,11 @@
 .pde-root[data-th=light]{--bg:#f3f5f8;--pn:#fff;--tx:#14161c;--mu:#5b6270;--br:#14161c1f;--bt:#14161c0d;--st:#dfe3ea;--ac:#1a6fe0}
 .pde-root.on{display:flex}
 .pde-root *{box-sizing:border-box}
+/* v0.5.2: App ki global button/header rules editor ke andar na ghusein — screenshot me orange gradient yahi se aa raha tha */
+.pde-root header{position:static;width:auto}
+.pde-root .pde-btn:not(.on),.pde-root .pde-tool:not(.on){background:var(--bt);color:var(--tx);border:1px solid var(--br);border-radius:12px;box-shadow:none}
+.pde-root .pde-btn.on,.pde-root .pde-tool.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pde-root .pde-top .pde-btn:not(.on){background:var(--bt)!important;color:var(--tx)!important;border:1px solid var(--br)!important}
 .pde-btn{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;border:1px solid var(--br);background:var(--bt);color:inherit;padding:0 12px;font:inherit;cursor:pointer;touch-action:manipulation}
 .pde-btn:hover{background:var(--br)}.pde-btn:active{transform:scale(.97)}
 .pde-btn:disabled{opacity:.35;cursor:default;transform:none}
@@ -16,7 +21,7 @@
 .pde-sub{color:var(--mu);font-size:12px}
 .pde-body{flex:1;min-height:0;display:flex}
 .pde-rail,.pde-props{display:none;background:var(--pn);flex:none}
-.pde-rail:not(:empty){display:flex;flex-direction:column;gap:6px;padding:8px;width:64px;border-right:1px solid var(--br);overflow:auto}
+.pde-rail:not(:empty){display:flex;flex-direction:column;gap:4px;padding:6px;width:60px;border-right:1px solid var(--br);overflow:auto}
 .pde-props:not(:empty){display:block;width:280px;padding:12px;border-left:1px solid var(--br);overflow:auto}
 .pde-stage{flex:1;min-width:0;display:flex;overflow:auto;padding:12px;background:var(--st);touch-action:none;cursor:grab;position:relative;outline:none;overscroll-behavior:contain}
 .pde-stage.pan{cursor:grabbing}
@@ -64,7 +69,7 @@
 .pde-pgr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .pde-pgr input[type=checkbox]{width:22px;height:22px;flex:none}
 .pde-top .pde-btn{padding:0 8px}
-@media (max-width:560px){.pde-top .pde-tx{display:none}}
+@media (max-width:560px){.pde-top .pde-tx{display:none}.pde-rail:not(:empty){width:56px;padding:6px 4px}.pde-tool small{font-size:9px}}
 /* ===== Phase 7–11: layers list, signature pad, OCR/form/redact sheets ===== */
 .pde-rail{scrollbar-width:thin}
 .pde-tool small{white-space:nowrap}
@@ -89,3 +94,11 @@
  .pde-sh{align-items:center}.pde-shc{border-radius:16px;transform:translateY(12px);opacity:0;transition:transform .18s,opacity .18s}.pde-sh.on .pde-shc{transform:none;opacity:1}.pde-shh{display:none}
  .pde-btn{min-height:40px}.pde-bar{justify-content:center}.pde-sp{flex:0 0 24px}
 }
+/* ===== v0.5.2: page thumbnail strip (neeche, current page ke aas-paas) ===== */
+.pde-thumbs{display:flex;gap:8px;overflow-x:auto;padding:8px 10px;background:var(--pn);border-top:1px solid var(--br);flex:none;scrollbar-width:thin}
+.pde-thumbs[hidden]{display:none}
+.pde-th{flex:none;width:56px;text-align:center;cursor:pointer}
+.pde-th canvas{width:56px;height:auto;display:block;border-radius:6px;background:#fff;border:2px solid transparent}
+.pde-th.on canvas{border-color:var(--ac)}
+.pde-th small{display:block;font-size:10px;color:var(--mu);margin-top:2px}
+.pde-th.on small{color:var(--tx);font-weight:700}

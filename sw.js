@@ -1,6 +1,6 @@
 // Offline-first + auto-update: cache se turant khulta hai (net ke bina bhi),
 // peeche se net pe latest file download karke cache update karta hai.
-const C = 'bijli-v19';
+const C = 'bijli-v20';
 const FILES = ['./', 'index.html', 'studyos.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 // Local pdf.js (repo ka pdfjs/ folder) - alag se add, taaki ek file na mile to baaki cache ho jayein
 const LOCAL_PDFJS = [

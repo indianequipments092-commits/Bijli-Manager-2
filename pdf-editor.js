@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 if(window.PDFEditor)return;
-const VERSION='0.5.1';
+const VERSION='0.5.2';
 const MB=1048576;
 
 /* ---------- Device / memory ---------- */
@@ -117,7 +117,7 @@ const IC={back:SVG('<path d="M15 5l-7 7 7 7"/>'),more:SVG('<circle cx="12" cy="5
  prev:SVG('<path d="M15 5l-7 7 7 7"/>'),next:SVG('<path d="M9 5l7 7-7 7"/>'),minus:SVG('<path d="M5 12h14"/>'),plus:SVG('<path d="M12 5v14M5 12h14"/>'),
  fit:SVG('<path d="M4 6v12M20 6v12M7 12h10M7 12l3-3M7 12l3 3M17 12l-3-3M17 12l-3 3"/>'),
  theme:SVG('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),info:SVG('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>'),
- undo:SVG('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),redo:SVG('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>')};
+ undo:SVG('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),redo:SVG('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),save:SVG('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'),exp:SVG('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>')};
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* File/Blob/Uint8Array/{blob()} — kisi bhi roop me file ke bytes nikalo. */
@@ -140,12 +140,12 @@ function start(ctx,host){
   '<div class="pde-title"><b class="pde-name"></b><small class="pde-sub"></small></div>'+
   '<button class="pde-btn pde-ic" data-a="un" aria-label="Undo" title="Undo (Ctrl+Z)">'+IC.undo+'</button>'+
   '<button class="pde-btn pde-ic" data-a="re" aria-label="Redo" title="Redo (Ctrl+Y)">'+IC.redo+'</button>'+
-  '<button class="pde-btn pde-ic" data-a="sv" aria-label="Save Draft" title="Save Draft (Ctrl+S)"><span class="pde-tx">Draft</span></button>'+
-  '<button class="pde-btn pde-ic" data-a="ex" aria-label="Export PDF" title="Export PDF"><span class="pde-tx">Export</span></button>'+
+  '<button class="pde-btn pde-ic" data-a="sv" aria-label="Save Draft" title="Save Draft (Ctrl+S)">'+IC.save+'<span class="pde-tx">Draft</span></button>'+
+  '<button class="pde-btn pde-ic" data-a="ex" aria-label="Export PDF" title="Export PDF">'+IC.exp+'<span class="pde-tx">Export</span></button>'+
   '<button class="pde-btn pde-ic" data-a="more" aria-label="More" aria-haspopup="true">'+IC.more+'</button></header>'+
   '<div class="pde-body"><aside class="pde-rail" aria-label="Tools"></aside>'+
   '<main class="pde-stage" tabindex="-1"><div class="pde-pg"><canvas></canvas></div><div class="pde-busy" hidden><span class="pde-busy-t">Page load ho raha hai…</span><i class="pde-busy-p"></i></div></main>'+
-  '<aside class="pde-props" aria-label="Properties"></aside></div>'+
+  '<aside class="pde-props" aria-label="Properties"></aside></div><div class="pde-thumbs" hidden></div>'+
   '<footer class="pde-bar"><button class="pde-btn pde-ic" data-a="prev" aria-label="Previous page" title="Previous page (PageUp)">'+IC.prev+'</button>'+
   '<label class="pde-pn"><input type="number" inputmode="numeric" min="1" aria-label="Page number"><span></span></label>'+
   '<button class="pde-btn pde-ic" data-a="next" aria-label="Next page" title="Next page (PageDown)">'+IC.next+'</button><i class="pde-sp"></i>'+
@@ -154,7 +154,7 @@ function start(ctx,host){
   '<button class="pde-btn pde-ic" data-a="fw" aria-label="Fit width" title="Fit width (0)">'+IC.fit+'</button></footer>'+
   '<div class="pde-sh" hidden><div class="pde-shk" data-a="sx"></div><div class="pde-shc" role="menu"><i class="pde-shh"></i><div class="pde-shb"></div></div></div>';
  document.body.appendChild(root);
- const q=s=>root.querySelector(s),stage=q('.pde-stage'),pg=q('.pde-pg'),busy=q('.pde-busy'),pin=q('.pde-pn input'),pnT=q('.pde-pn span'),zv=q('.pde-zv'),sh=q('.pde-sh'),shb=q('.pde-shb');
+ const q=s=>root.querySelector(s),stage=q('.pde-stage'),pg=q('.pde-pg'),busy=q('.pde-busy'),pin=q('.pde-pn input'),pnT=q('.pde-pn span'),zv=q('.pde-zv'),sh=q('.pde-sh'),shb=q('.pde-shb'),thEl=q('.pde-thumbs');
  q('.pde-name').textContent=ctx.name||'PDF';
  const sub=()=>{q('.pde-sub').textContent=(st.total||ctx.total)+' pages'+(st.dirty?' · unsaved':'')+(st.autoSavedAt?' · Auto-saved '+st.autoSavedAt:'')};sub();
  const prevOv=document.documentElement.style.overflow;document.documentElement.style.overflow='hidden';
@@ -184,7 +184,7 @@ function start(ctx,host){
   if(rt!=st.rt)return;
   cv.style.width=pg.style.width;cv.style.height=pg.style.height;pg.appendChild(ovCv);drawOv();setBusy(0)}
  async function show(k,keep){
-  k=clamp(k,0,st.pages.length-1);const t=++st.tk;st.page=k;lab();setBusy(1);
+  k=clamp(k,0,st.pages.length-1);const t=++st.tk;st.page=k;lab();setBusy(1);updThumbs();
   if(st.dirty)scheduleAutoSave();
   const pgd=st.pages[k];
   if(pgd.src<0&&!pgd.ext){ /* blank page */
@@ -264,6 +264,29 @@ function start(ctx,host){
    if(st.ownDocP){try{const d=await Promise.race([st.ownDocP,new Promise(r=>setTimeout(()=>r(null),8000))]);if(d)return d.getPage(pgd.src+1)}catch(e){}}
    return ctx.getPage(pgd.src)}
   return null}
+ /* ===== v0.5.2: neeche thumbnail strip — current page ke aas-paas ke pages, tap karke jump ===== */
+ const thCache=new Map();let thTk=0;
+ async function thumbFor(i){
+  if(thCache.has(i))return thCache.get(i);
+  const cv=document.createElement('canvas'),pgd=st.pages[i];
+  if(pgd&&(pgd.src>=0||pgd.ext)){
+   try{const p=await getPdfPage(i);
+    if(p){const v0=p.getViewport({scale:1,rotation:pgd.rot||0}),s=56/v0.width,vp=p.getViewport({scale:s,rotation:pgd.rot||0});
+     cv.width=Math.max(1,Math.ceil(vp.width));cv.height=Math.max(1,Math.ceil(vp.height));
+     const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);
+     await p.render({canvasContext:x,viewport:vp}).promise}}catch(e){}
+  }
+  if(!cv.width){cv.width=56;cv.height=79;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,56,79)}
+  if(thCache.size>=40)thCache.delete(thCache.keys().next().value);
+  thCache.set(i,cv);return cv}
+ async function updThumbs(){
+  if(!thEl)return;const t=++thTk,a=Math.max(0,st.page-3),b=Math.min(st.pages.length-1,st.page+3);
+  thEl.hidden=false;thEl.innerHTML='';
+  for(let i=a;i<=b;i++){
+   const d=document.createElement('div');d.className='pde-th'+(i===st.page?' on':'');d.dataset.pg=i;
+   d.innerHTML='<small>'+(i+1)+'</small>';thEl.appendChild(d);
+   thumbFor(i).then(cv=>{if(t!==thTk)return;const el=thEl.querySelector('[data-pg="'+i+'"]');if(el&&!el.querySelector('canvas'))el.insertBefore(cv,el.firstChild)}).catch(()=>{})}
+  const cur=thEl.querySelector('.pde-th.on');if(cur)cur.scrollIntoView({inline:'center',block:'nearest'})}
  async function pgDims(pos){const p=await getPdfPage(pos);if(!p)return[595,842];const v=p.getViewport({scale:1});return[v.width,v.height]}
  /* rotation maps: unrotated top-left <-> displayed top-left; displayed -> pdf-lib bottom-left */
  function rotPt(x,y,rot,W,H){rot=((rot%360)+360)%360;
@@ -1442,6 +1465,7 @@ function start(ctx,host){
   document.documentElement.style.overflow=prevOv;root.remove();st.pgObj=null}
  try{history.pushState({pde:1},'');st.pushed=true}catch(e){st.pushed=false}
  window.addEventListener('popstate',onPop);
+ thEl.addEventListener('click',ev=>{const t=ev.target.closest('[data-pg]');if(t)show(+t.dataset.pg,0)});
 
  /* ----- Buttons ----- */
  root.addEventListener('click',ev=>{const b=ev.target.closest('[data-a]');if(!b||b.disabled)return;const a=b.dataset.a;
