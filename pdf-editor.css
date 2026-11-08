@@ -1,0 +1,91 @@
+/* PDF Editor Pro - Phase 1. Sirf Edit dabane par load hota hai. Sab class .pde- se shuru. */
+.pde-root{--bg:#14161c;--pn:#1b1e26;--tx:#f2f4f8;--mu:#9aa3b2;--br:#ffffff1f;--bt:#ffffff12;--st:#0d0f13;--ac:#4c9aff;
+ position:fixed;inset:0;z-index:100001;display:none;flex-direction:column;background:var(--bg);color:var(--tx);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;
+ -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+.pde-root[data-th=light]{--bg:#f3f5f8;--pn:#fff;--tx:#14161c;--mu:#5b6270;--br:#14161c1f;--bt:#14161c0d;--st:#dfe3ea;--ac:#1a6fe0}
+.pde-root.on{display:flex}
+.pde-root *{box-sizing:border-box}
+.pde-btn{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;border:1px solid var(--br);background:var(--bt);color:inherit;padding:0 12px;font:inherit;cursor:pointer;touch-action:manipulation}
+.pde-btn:hover{background:var(--br)}.pde-btn:active{transform:scale(.97)}
+.pde-btn:disabled{opacity:.35;cursor:default;transform:none}
+.pde-btn:focus-visible,.pde-pn input:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.pde-ic{padding:0 10px}
+.pde-top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-right,0px)) 8px calc(10px + env(safe-area-inset-left,0px));background:var(--pn);border-bottom:1px solid var(--br)}
+.pde-title{flex:1;min-width:0;display:flex;flex-direction:column}
+.pde-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pde-sub{color:var(--mu);font-size:12px}
+.pde-body{flex:1;min-height:0;display:flex}
+.pde-rail,.pde-props{display:none;background:var(--pn);flex:none}
+.pde-rail:not(:empty){display:flex;flex-direction:column;gap:6px;padding:8px;width:64px;border-right:1px solid var(--br);overflow:auto}
+.pde-props:not(:empty){display:block;width:280px;padding:12px;border-left:1px solid var(--br);overflow:auto}
+.pde-stage{flex:1;min-width:0;display:flex;overflow:auto;padding:12px;background:var(--st);touch-action:none;cursor:grab;position:relative;outline:none;overscroll-behavior:contain}
+.pde-stage.pan{cursor:grabbing}
+.pde-pg{margin:auto;flex:none;background:#fff;box-shadow:0 2px 14px #0000004d;will-change:transform}
+.pde-pg canvas{display:block}
+.pde-busy{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#000b;color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;pointer-events:none}
+.pde-busy[hidden]{display:none}
+.pde-bar{display:flex;align-items:center;gap:6px;padding:8px calc(10px + env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) calc(10px + env(safe-area-inset-left,0px));background:var(--pn);border-top:1px solid var(--br)}
+.pde-sp{flex:1}
+.pde-pn{display:inline-flex;align-items:center;gap:6px;color:var(--mu);white-space:nowrap}
+.pde-pn input{width:64px;height:44px;border-radius:12px;border:1px solid var(--br);background:var(--bt);color:var(--tx);text-align:center;font:inherit;font-size:16px;-moz-appearance:textfield;user-select:text;-webkit-user-select:text}
+.pde-pn input::-webkit-outer-spin-button,.pde-pn input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pde-zv{min-width:46px;text-align:center;font-weight:600}
+.pde-sh{position:absolute;inset:0;z-index:5;display:flex;align-items:flex-end;justify-content:center}
+.pde-sh[hidden]{display:none}
+.pde-shk{position:absolute;inset:0;background:#0000;transition:background .18s}
+.pde-sh.on .pde-shk{background:#0008}
+.pde-shc{position:relative;width:100%;max-width:520px;background:var(--pn);color:var(--tx);border-radius:18px 18px 0 0;padding:8px 12px calc(14px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .18s ease;box-shadow:0 -6px 24px #0000004d}
+.pde-sh.on .pde-shc{transform:none}
+.pde-shh{display:block;width:40px;height:4px;border-radius:4px;background:var(--br);margin:4px auto 10px}
+.pde-mi{width:100%;justify-content:flex-start;margin-top:8px;text-align:left}
+.pde-inf p{margin:6px 0 0;color:var(--mu)}
+.pde-toast{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:90%;background:#000d;color:#fff;padding:9px 14px;border-radius:12px;font-size:13px;z-index:6}
+@media (max-width:430px){.pde-pn span{display:none}.pde-bar{gap:4px}.pde-pn input{width:56px}.pde-zv{min-width:42px}.pde-sp{display:none}.pde-bar{justify-content:space-between}}
+@media (max-width:380px){.pde-tx{display:none}}
+@media (max-width:340px){.pde-zv{display:none}}
+/* ===== Phase 2–6: rail tools, overlay, sheet fields, page list ===== */
+.pde-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pde-tool{flex-direction:column;gap:2px;font-size:18px;padding:6px 2px;min-width:52px}
+.pde-tool small{font-size:10px;line-height:1}
+.pde-tool.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pde-pg{position:relative}
+.pde-ov{position:absolute;left:0;top:0;touch-action:none}
+.pde-fld{display:block;margin-top:10px;color:var(--mu);font-size:13px}
+.pde-fld input,.pde-fld textarea,.pde-fld select{width:100%;margin-top:4px;min-height:44px;border-radius:10px;border:1px solid var(--br);background:var(--bt);color:var(--tx);font:inherit;padding:8px 10px;user-select:text;-webkit-user-select:text}
+.pde-fld input[type=checkbox]{width:22px;height:22px;min-height:0}
+.pde-row{display:flex;gap:8px;margin-top:10px;align-items:flex-end}
+.pde-row>*{flex:1;min-width:0}
+.pde-row .pde-btn{flex:1;justify-content:center}
+.pde-shb .pde-btn{margin-top:10px}
+.pde-shb .pde-row .pde-btn{margin-top:0}
+.pde-mu{color:var(--mu);font-size:12px}
+.pde-pgl{margin-top:10px;max-height:40vh;overflow:auto}
+.pde-pgr{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--br);border-radius:10px;margin-top:6px}
+.pde-pgr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pde-pgr input[type=checkbox]{width:22px;height:22px;flex:none}
+.pde-top .pde-btn{padding:0 8px}
+@media (max-width:560px){.pde-top .pde-tx{display:none}}
+/* ===== Phase 7–11: layers list, signature pad, OCR/form/redact sheets ===== */
+.pde-rail{scrollbar-width:thin}
+.pde-tool small{white-space:nowrap}
+#pde-sigpad{cursor:crosshair}
+.pde-shb canvas#pde-sigpad{background:#fff}
+.pde-pgl .pde-pgr input[type=checkbox]{flex:none}
+.pde-pgr .pde-btn{flex:none}
+/* ===== Phase 12–15: compare, export progress, AI, diagnostics ===== */
+.pde-busy{border-radius:14px;min-width:220px;text-align:center}
+.pde-busy-t{display:block}
+.pde-busy-p{display:block;height:4px;background:var(--ac);border-radius:2px;margin-top:6px;width:0;transition:width .2s}
+.pde-cmp{display:flex;gap:8px;margin-top:10px}
+.pde-cmp>div{flex:1;min-width:0}
+.pde-cmp canvas{max-width:100%;border:1px solid var(--br);border-radius:8px;background:#fff}
+.pde-ai-res{margin-top:10px;white-space:pre-wrap;word-break:break-word;background:var(--bt);border:1px solid var(--br);border-radius:10px;padding:10px;font-size:13px;max-height:40vh;overflow:auto}
+.pde-ai-res textarea{width:100%;min-height:60px;background:transparent;border:1px solid var(--br);border-radius:8px;color:var(--tx);font:inherit;resize:vertical;padding:6px}
+.pde-chk{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--br);border-radius:10px;margin-top:6px}
+.pde-chk input[type=checkbox]{width:22px;height:22px;flex:none}
+.pde-chk span{flex:1}
+/* PC: bada canvas, sheet beech me */
+@media (min-width:768px) and (pointer:fine){
+ .pde-sh{align-items:center}.pde-shc{border-radius:16px;transform:translateY(12px);opacity:0;transition:transform .18s,opacity .18s}.pde-sh.on .pde-shc{transform:none;opacity:1}.pde-shh{display:none}
+ .pde-btn{min-height:40px}.pde-bar{justify-content:center}.pde-sp{flex:0 0 24px}
+}
