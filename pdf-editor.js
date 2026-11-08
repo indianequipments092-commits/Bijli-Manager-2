@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 if(window.PDFEditor)return;
-const VERSION='0.5.0';
+const VERSION='0.5.1';
 const MB=1048576;
 
 /* ---------- Device / memory ---------- */
@@ -120,6 +120,12 @@ const IC={back:SVG('<path d="M15 5l-7 7 7 7"/>'),more:SVG('<circle cx="12" cy="5
  undo:SVG('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),redo:SVG('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>')};
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* File/Blob/Uint8Array/{blob()} — kisi bhi roop me file ke bytes nikalo. */
+async function fileBytes(f){if(!f)return null;
+ if(f instanceof Uint8Array)return f;
+ if(typeof f.arrayBuffer=='function')return new Uint8Array(await f.arrayBuffer());
+ if(typeof f.blob=='function'){const b=await f.blob();if(b&&typeof b.arrayBuffer=='function')return new Uint8Array(await b.arrayBuffer())}
+ return null}
 function themePick(){try{const t=localStorage.getItem('pdeTheme');if(t=='dark'||t=='light')return t}catch(e){}
  const a=document.documentElement.getAttribute('data-theme');if(a=='light'||a=='dark')return a;
  try{return matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'}catch(e){return 'dark'}}
@@ -204,6 +210,21 @@ function start(ctx,host){
  /* Objects: page ke andar, displayed page space me (origin upar-left, PDF points).
     Rotation wale page par export ke liye pdfPt/imgPos se wapas map hota hai. */
  st.pages=[];for(let i=0;i<ctx.total;i++)st.pages.push({src:i,rot:0,objs:[]});
+ /* Apni pdf.js copy: viewer band hote hi uska document destroy ho jata hai (viewer close par doc.destroy()),
+    isliye editor page dikhane ke liye viewer par nirbhar nahi rahega. Bytes pencil dabate hi nikaale jate hain (edGo),
+    taaki viewer band ho jane ke baad bhi page khul sakein. */
+ st.ownDoc=null;st.ownDocP=null;st.fileBytes=null;
+ st.ownDocP=(async()=>{try{
+  let u8=null;
+  if(ctx.dataP){try{u8=await ctx.dataP}catch(e){u8=null}}
+  if(!u8)u8=await fileBytes(ctx.file);
+  if(!u8||!u8.length)return null;
+  st.fileBytes=u8;
+  const H=host||{};
+  if(!window.pdfjsLib&&typeof H.PJ=='function'){try{await H.PJ()}catch(e){}}
+  if(!window.pdfjsLib)return null;
+  const d=await window.pdfjsLib.getDocument({data:u8.slice()}).promise;
+  st.ownDoc=d;return d}catch(e){return null}})();
  st.total=st.pages.length;st.extDocs={};st.sel=null;st.tool='select';st.subtool=null;
  st.hist=[];st.hi=-1;st.wc=null;st.wcTried=false;st.find=null;st.findHi=null;st.gesture=null;
  st.selPages=new Set();st.propHist=false;st.defT={txt:'',size:18,color:'#111111',bold:false,italic:false,align:'left'};st.noteTxt='';
@@ -227,15 +248,22 @@ function start(ctx,host){
  function pushHistOnce(){if(st.propHist)return;st.propHist=true;pushHist()}
  function syncTotal(){st.total=st.pages.length;sub()}
  async function ensureWC(){if(st.wc||st.wcTried)return;st.wcTried=true;
-  if(ctx.file&&ctx.file.size){try{st.wc=await createCopy(ctx.file,ctx.name||'PDF')}catch(e){toast('Working copy nahi bani: '+(e&&e.message||e))}}
-  else toast('Original file yahan nahi mili — Export memory se hoga')}
+  try{
+   if(st.ownDocP){try{await st.ownDocP}catch(e){}}
+   let b=st.fileBytes;if(!b)b=await fileBytes(ctx.file);
+   if(b&&b.length)st.wc=await createCopy(new Blob([b],{type:'application/pdf'}),ctx.name||'PDF');
+   else toast('Original file yahan nahi mili — Export memory se hoga')}
+  catch(e){toast('Working copy nahi bani: '+(e&&e.message||e))}}
  function commit(){pushHist();st.aiTxt=null;markDirty(true);ensureWC();scheduleAutoSave()}
  function doUndo(){if(st.hi<=0){toast('Undo karne ko kuch nahi');return}st.hi--;applySnap(st.hist[st.hi]);markDirty(true);show(st.page,1)}
  function doRedo(){if(st.hi>=st.hist.length-1){toast('Redo karne ko kuch nahi');return}st.hi++;applySnap(st.hist[st.hi]);markDirty(true);show(st.page,1)}
  function loadImg(src){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=()=>no(new Error('Image nahi khuli'));im.src=src})}
  async function getPdfPage(pos){const pgd=st.pages[pos];if(!pgd)return null;
   if(pgd.ext){const d=st.extDocs[pgd.ext.id];return d?d.doc.getPage(pgd.ext.idx+1):null}
-  if(pgd.src>=0)return ctx.getPage(pgd.src);return null}
+  if(pgd.src>=0){
+   if(st.ownDocP){try{const d=await Promise.race([st.ownDocP,new Promise(r=>setTimeout(()=>r(null),8000))]);if(d)return d.getPage(pgd.src+1)}catch(e){}}
+   return ctx.getPage(pgd.src)}
+  return null}
  async function pgDims(pos){const p=await getPdfPage(pos);if(!p)return[595,842];const v=p.getViewport({scale:1});return[v.width,v.height]}
  /* rotation maps: unrotated top-left <-> displayed top-left; displayed -> pdf-lib bottom-left */
  function rotPt(x,y,rot,W,H){rot=((rot%360)+360)%360;
@@ -1408,6 +1436,7 @@ function start(ctx,host){
  function end(){
   if(S!==st)return;S=null;clearTimeout(st.rtm);clearTimeout(st.autoTimer);cancelAnimationFrame(st.raf);st.tk++;st.rt++;
   if(st.task){try{st.task.cancel()}catch(e){}}
+  if(st.ownDoc){try{st.ownDoc.destroy()}catch(e){}}st.ownDoc=null;st.ownDocP=null;
   window.removeEventListener('popstate',onPop);window.removeEventListener('keydown',onKey,true);window.removeEventListener('resize',onResize);
   if(window.visualViewport)visualViewport.removeEventListener('resize',onResize);
   document.documentElement.style.overflow=prevOv;root.remove();st.pgObj=null}

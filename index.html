@@ -3624,7 +3624,10 @@ function pvOpen(items,idx,mode,opt){if(PV)PV.close();const o=document.createElem
   if(!multi&&mv<10&&dt<300){const n=Date.now();if(n-lt<320&&Math.hypot(ev.clientX-lx,ev.clientY-ly)<30){lt=0;clearTimeout(tapT);zAnim(z>1.3?1:2.5,ev)}else{lt=n;lx=ev.clientX;ly=ev.clientY;clearTimeout(tapT);if(pdfv)tapT=setTimeout(barTog,260)}}
   else if(!multi&&!scr&&z<=1.05&&Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.5)go(dx<0?1:-1);else if(!NV.on&&scr&&!multi&&mv>=10&&ev.timeStamp-lmt<90&&flingV(ev.timeStamp))sFling();later()};
  st.addEventListener('wheel',ev=>{if(NV.on&&!ev.ctrlKey)return;ev.preventDefault();lgm=performance.now();if(pdfv){barHide();if(scr)pillPing()}if(scr&&!ev.ctrlKey){x-=ev.deltaX;y-=ev.deltaY;apply();later();return}if(pcm&&!ev.ctrlKey){if(z>1.01){x-=ev.shiftKey?ev.deltaY:ev.deltaX;y-=ev.shiftKey?0:ev.deltaY;apply();later()}else{const n=performance.now();if(n-pcWh>220&&Math.abs(ev.deltaY)>1){pcWh=n;go(ev.deltaY>0?1:-1)}}return}zoomAt(ev.clientX,ev.clientY,pcm?pcWf(ev):(ev.deltaY<0?1.2:1/1.2))},{passive:false});
- function edGo(){o.classList.remove('pvmo');if(!window.PDFED)return;PDFED.open({name:(opt&&opt.name)||'PDF',size:(opt&&opt.size)||0,total:items.length,page:cur,file:opt&&opt.file,getPage:k=>items[k].d.getPage(items[k].i)}).catch(er=>{if(er&&er.message)alert('Editor nahi khula: '+er.message)})}
+ function edGo(){o.classList.remove('pvmo');if(!window.PDFED){alert('Editor load nahi hua. App band karke dobara kholo.');return}
+  /* Bytes abhi nikaalo: viewer band hote hi uska PDF document destroy ho jata hai, uske baad bytes nahi milenge. */
+  let dataP=null;try{const f=opt&&opt.file;if(f&&typeof f.blob=='function')dataP=f.blob().then(b=>b.arrayBuffer()).then(ab=>new Uint8Array(ab)).catch(()=>null);else if(f&&typeof f.arrayBuffer=='function')dataP=f.arrayBuffer().then(ab=>new Uint8Array(ab)).catch(()=>null)}catch(e){dataP=null}
+  PDFED.open({name:(opt&&opt.name)||'PDF',size:(opt&&opt.size)||0,total:items.length,page:cur,file:opt&&opt.file,dataP,getPage:k=>items[k].d.getPage(items[k].i)}).catch(er=>{if(er&&er.message)alert('Editor nahi khula: '+er.message)})}
  o.onclick=ev=>{const b=ev.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,r=st.getBoundingClientRect();if(a=='ed'){edGo();return}
   if(a=='mm'||a=='mx'){const op=a=='mm'&&!o.classList.contains('pvmo');if(op&&o._mo)o._mo();o.classList.toggle('pvmo',op);if(pdfv)barArm();return}
   if(o._mn&&['lx','wk','bm','bl','lg','ol','lo','fi','gp','gj','sh','ow','sv','pi','pr'].includes(a)){o._mn(a,b);return}
@@ -4135,7 +4138,7 @@ return{card,run}})();
 </script>
 <script>/* ===== PDF Editor Pro - Phase 0: lazy loader. Editor ki files sirf PDFED.load() par aati hain. Viewer kholne par kuch load nahi hota. ===== */
 window.PDFED=(()=>{
-const V='0.5.0',JS='pdf-editor.js?v='+V,CSS='pdf-editor.css?v='+V;let pr=null,ov=null;
+const V='0.5.1',JS='pdf-editor.js?v='+V,CSS='pdf-editor.css?v='+V;let pr=null,ov=null;
 const host=()=>({PL:typeof PL=='function'?PL:null,PJ:typeof PJ=='function'?PJ:null,RBFK:typeof RBFK=='function'?RBFK:null});
 function hide(){if(ov){ov.remove();ov=null}}
 function show(msg,err,onRetry){hide();ov=document.createElement('div');ov.setAttribute('role','alertdialog');
