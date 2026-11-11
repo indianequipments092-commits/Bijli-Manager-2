@@ -159,15 +159,18 @@ details.nt p{margin:0!important;padding:0 12px 11px;font-size:12px}
 #tr>p.mu{text-align:center;padding:14px}
 #tr>p.w{background:color-mix(in srgb,var(--bad) 10%,var(--cd));border:1px solid color-mix(in srgb,var(--bad) 35%,var(--br));padding:11px 13px;border-radius:14px}
 /* ===== GPS Speedometer (Travel tool) ===== */
+.spd-hero{background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 10%,var(--cd)),var(--cd) 55%);border:1px solid color-mix(in srgb,var(--ac) 25%,var(--br));border-radius:22px;padding:14px 10px 6px;margin-bottom:10px;box-shadow:0 12px 30px -18px #000}
 .spd-gauge{position:relative;max-width:340px;margin:2px auto 0}
 .spd-gauge svg{width:100%;display:block}
 .spd-bg{fill:none;stroke:var(--br);stroke-width:16;stroke-linecap:round}
-.spd-fg{fill:none;stroke:#22c55e;stroke-width:16;stroke-linecap:round;stroke-dasharray:314.16;stroke-dashoffset:314.16;transition:stroke-dashoffset .4s ease,stroke .4s}
-.spd-center{position:absolute;left:0;right:0;top:28%;text-align:center}
-.spd-center #spd_speed{font-size:76px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.spd-fg{fill:none;stroke-width:16;stroke-linecap:round;stroke-dasharray:314.16;stroke-dashoffset:314.16;transition:stroke-dashoffset .35s linear;filter:drop-shadow(0 0 6px rgba(56,189,248,.35))}
+.spd-center{position:absolute;left:0;right:0;top:24%;text-align:center}
+.spd-center #spd_speed{font-size:60px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
 .spd-center #spd_unit{font-size:16px;color:var(--mu);margin-top:2px}
 .spd-src{font-size:12px;color:var(--mu);margin-top:6px}
+.spd-acc-pill{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
 .spd-tick{font-size:10px;fill:var(--mu);font-weight:600}
+.spd-tickline{stroke:var(--mu);stroke-width:1.5;opacity:.6}
 .spd-over{background:color-mix(in srgb,#ef4444 12%,var(--cd));border:1px solid #ef4444;color:#ef4444;font-weight:700;text-align:center;border-radius:12px;padding:10px;margin:10px 0}
 .spd .kp b{font-variant-numeric:tabular-nums}
 .spd h3{margin-top:14px}
@@ -867,33 +870,35 @@ const spdTrips=()=>{try{const t=JSON.parse(localStorage.getItem(SPD_KEY+'_trips'
 const spdSaveTrips=t=>{try{localStorage.setItem(SPD_KEY+'_trips',JSON.stringify(t.slice(0,20)))}catch(x){}};
 const spdOdo=()=>{try{return +localStorage.getItem(SPD_KEY+'_odo')||0}catch(x){return 0}};
 const spdSaveOdo=v=>{try{localStorage.setItem(SPD_KEY+'_odo',String(Math.round(v)))}catch(x){}};
-function spdNew(){const c=spdLoad();return{ui:(c.ui==null?0:+c.ui)||0,limitKmh:(c.limitKmh==null?80:+c.limitKmh)||80,vib:c.vib!==false,watchId:null,timer:null,wake:null,last:null,maxMs:0,distM:0,startT:null,movingSec:0,curMs:0,smooth:0,fixes:0,acc:null,alt:null,altAcc:null,head:null,lat:null,lon:null,src:'—',lastFixT:null,over:false,running:false,saved:false,lowAcc:false}}
+function spdNew(){const c=spdLoad();return{ui:(c.ui==null?0:+c.ui)||0,limitKmh:(c.limitKmh==null?80:+c.limitKmh)||80,vib:c.vib!==false,watchId:null,timer:null,wake:null,last:null,maxMs:0,distM:0,startT:null,movingSec:0,curMs:0,smooth:0,fixes:0,acc:null,alt:null,altAcc:null,head:null,lat:null,lon:null,src:'—',lastFixT:null,over:false,running:false,saved:false,lowAcc:false,spdAcc:null}}
 function spdFmt(s){s=Math.floor(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>(n<10?'0':'')+n;return (h?h+':':'')+p(m)+':'+p(x)}
 function spdHav(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lon-a.lon),h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)*Math.sin(dLo/2);return 2*R*Math.asin(Math.sqrt(h))}
 function spdRender(){
  if(!SPD)return;
  const g=spdEl('spd_speed');if(!g)return;
  const u=SPD_UNITS[SPD.ui],v=SPD.curMs*u.f;
- g.textContent=Math.round(v);
+ g.textContent=v.toFixed(2);
  spdEl('spd_unit').textContent=u.n;
  const ub=spdEl('spd_unitBtn');if(ub)ub.textContent=u.n;
  const arc=spdEl('spd_arc');
  const frac=Math.min(v/u.max,1);
  arc.style.strokeDashoffset=String(314.16*(1-frac));
- arc.style.stroke=SPD.over?'#ef4444':frac<.5?'#22c55e':frac<.8?'#f59e0b':'#ef4444';
  const set=(id,t)=>{const el=spdEl(id);if(el)el.textContent=t};
  const elapsed=SPD.startT?(Date.now()-SPD.startT)/1000:0;
  const avgMs=elapsed>0?SPD.distM/elapsed:0;
  const mavgMs=SPD.movingSec>0?SPD.distM/SPD.movingSec:0;
- set('spd_max',Math.round(SPD.maxMs*u.f)+' '+u.n);
- set('spd_avg',Math.round(avgMs*u.f)+' '+u.n);
- set('spd_mavg',Math.round(mavgMs*u.f)+' '+u.n);
+ set('spd_max',(SPD.maxMs*u.f).toFixed(2)+' '+u.n);
+ set('spd_avg',(avgMs*u.f).toFixed(2)+' '+u.n);
+ set('spd_mavg',(mavgMs*u.f).toFixed(2)+' '+u.n);
  set('spd_dist',SPD.ui==2?(SPD.distM>=1000?(SPD.distM/1000).toFixed(2)+' km':Math.round(SPD.distM)+' m'):(SPD.distM*u.df).toFixed(2)+' '+u.d);
  set('spd_time',spdFmt(elapsed));
  set('spd_moving',spdFmt(SPD.movingSec));
  set('spd_alt',SPD.alt==null?'—':Math.round(SPD.alt)+' m'+(SPD.altAcc!=null?' (±'+Math.round(SPD.altAcc)+' m)':''));
  set('spd_head',SPD.head==null?'—':Math.round(SPD.head)+'° '+SPD_DIRS[Math.round(SPD.head/22.5)%16]);
  set('spd_acc',SPD.acc==null?'—':'±'+Math.round(SPD.acc)+' m');
+ set('spd_spdacc',SPD.spdAcc==null?'—':'±'+(SPD.spdAcc*u.f).toFixed(2)+' '+u.n);
+ const ap=spdEl('spd_accpill');
+ if(ap){const a=SPD.acc;ap.textContent=a==null?'GPS —':'GPS ±'+Math.round(a)+' m • '+(a<=10?'Excellent':a<=25?'Good':a<=50?'Fair':'Poor');const col=a==null?'var(--mu)':a<=10?'var(--ok)':a<=25?'var(--ok)':a<=50?'var(--am)':'var(--bad)';ap.style.color=col;ap.style.borderColor=col}
  set('spd_lat',SPD.lat==null?'—':SPD.lat.toFixed(5));
  set('spd_lon',SPD.lon==null?'—':SPD.lon.toFixed(5));
  set('spd_fixes',String(SPD.fixes));
@@ -903,7 +908,7 @@ function spdRender(){
  const sig=spdEl('spd_sig');
  if(sig){const a=SPD.acc;sig.textContent=a==null?'—':a<=10?'Excellent':a<=25?'Good':a<=50?'Fair':'Poor';sig.style.color=a==null?'':a<=10?'var(--ok)':a<=25?'var(--ok)':a<=50?'var(--am)':'var(--bad)'}
  const ov=spdEl('spd_over');
- if(ov){ov.style.display=SPD.over?'block':'none';if(SPD.over)set('spd_over_v',Math.round(v)+' '+u.n+' (limit '+Math.round(SPD.limitKmh/3.6*u.f)+' '+u.n+')')}
+ if(ov){ov.style.display=SPD.over?'block':'none';if(SPD.over)set('spd_over_v',v.toFixed(2)+' '+u.n+' (limit '+(SPD.limitKmh/3.6*u.f).toFixed(2)+' '+u.n+')')}
 }
 function spdPos(p){
  if(!SPD)return;
@@ -914,7 +919,10 @@ function spdPos(p){
  else if(SPD.last&&cur.acc<=40){const dt=(now-SPD.last.t)/1000;if(dt>0.5){ms=spdHav(SPD.last,cur)/dt;SPD.src='Calculated'}}
  if(ms===null){ms=0;SPD.src=SPD.lowAcc?'Network':'GPS'}
  if(ms*3.6<1.5)ms=0;
- SPD.smooth=SPD.smooth*0.4+ms*0.6;
+ const al=cur.acc<=10?0.85:cur.acc<=25?0.7:cur.acc<=50?0.55:0.4;
+ if(SPD.fixes>0&&cur.acc>50&&Math.abs(ms-SPD.smooth)>25/3.6)ms=SPD.smooth+Math.sign(ms-SPD.smooth)*25/3.6;
+ if(SPD.fixes===0)SPD.smooth=ms;
+ else SPD.smooth=SPD.smooth*(1-al)+ms*al;
  SPD.curMs=SPD.smooth<0.3?0:SPD.smooth;
  if(SPD.last){const dt=Math.min(10,Math.max(0,(now-SPD.last.t)/1000));if(ms>0.42)SPD.movingSec+=dt}
  if(SPD.curMs>SPD.maxMs&&cur.acc<=50)SPD.maxMs=SPD.curMs;
@@ -923,6 +931,7 @@ function spdPos(p){
  SPD.alt=(typeof c.altitude=='number'&&!isNaN(c.altitude))?c.altitude:null;
  SPD.altAcc=(typeof c.altitudeAccuracy=='number'&&!isNaN(c.altitudeAccuracy))?c.altitudeAccuracy:null;
  SPD.head=(typeof c.heading=='number'&&!isNaN(c.heading))?c.heading:null;
+ SPD.spdAcc=(typeof c.speedAccuracy=='number'&&!isNaN(c.speedAccuracy))?c.speedAccuracy:null;
  SPD.lat=c.latitude;SPD.lon=c.longitude;SPD.lastFixT=now;
  const st=spdEl('spd_status');if(st)st.textContent='GPS OK • accuracy ±'+Math.round(c.accuracy)+' m';
  const u=SPD_UNITS[SPD.ui],v=SPD.curMs*u.f,lim=SPD.limitKmh/3.6*u.f;
@@ -961,7 +970,7 @@ function spdStart(){
  SPD.startT=SPD.startT||Date.now();
  SPD.running=true;SPD.over=false;SPD.lowAcc=false;
  spdWatch(true);
- SPD.timer=setInterval(spdRender,1000);
+ SPD.timer=setInterval(spdRender,400);
  spdWake();
  const st=spdEl('spd_status');if(st)st.textContent='GPS fix dhundh rahe hain — pehli baar 1 minute tak lag sakta hai, khule aasman me raho';
  spdSyncBtns();
@@ -992,7 +1001,7 @@ function spdStop(){
 function spdReset(){
  if(!SPD)SPD=spdNew();
  spdStop();
- SPD.maxMs=0;SPD.distM=0;SPD.movingSec=0;SPD.fixes=0;SPD.curMs=0;SPD.smooth=0;SPD.startT=null;SPD.saved=false;SPD.over=false;SPD.lowAcc=false;SPD.acc=null;SPD.alt=null;SPD.head=null;SPD.lat=null;SPD.lon=null;SPD.lastFixT=null;SPD.src='—';
+ SPD.maxMs=0;SPD.distM=0;SPD.movingSec=0;SPD.fixes=0;SPD.curMs=0;SPD.smooth=0;SPD.startT=null;SPD.saved=false;SPD.over=false;SPD.lowAcc=false;SPD.spdAcc=null;SPD.acc=null;SPD.alt=null;SPD.head=null;SPD.lat=null;SPD.lon=null;SPD.lastFixT=null;SPD.src='—';
  const st=spdEl('spd_status');if(st)st.textContent='Reset ho gaya — Start dabao';
  spdRender();spdSyncBtns();
 }
@@ -1021,13 +1030,13 @@ function spdInit(){
 Object.assign(V,{sm:['GPS Speedometer',()=>{
  setTimeout(spdInit,0);
  return `<div class="spd">
- <div class="spd-gauge"><svg viewBox="0 0 240 150"><text class="spd-tick" x="14" y="140">0</text><text class="spd-tick" x="44" y="52">50</text><text class="spd-tick" x="112" y="16">100</text><text class="spd-tick" x="182" y="52">150</text><text class="spd-tick" x="212" y="140">200</text><path class="spd-bg" d="M20 120 A100 100 0 0 1 220 120"/><path class="spd-fg" id="spd_arc" d="M20 120 A100 100 0 0 1 220 120"/></svg><div class="spd-center"><div id="spd_speed">0</div><div id="spd_unit">km/h</div><div class="spd-src">Source: <span id="spd_src">—</span></div></div></div>
+ <div class="spd-hero"><div class="spd-gauge"><svg viewBox="0 0 240 150"><defs><linearGradient id="spdGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#22c55e"/><stop offset="55%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs><line class="spd-tickline" x1="28" y1="120" x2="14" y2="120"/><line class="spd-tickline" x1="54.9" y1="54.9" x2="45" y2="45"/><line class="spd-tickline" x1="120" y1="28" x2="120" y2="14"/><line class="spd-tickline" x1="185.1" y1="54.9" x2="195" y2="45"/><line class="spd-tickline" x1="212" y1="120" x2="226" y2="120"/><text class="spd-tick" x="14" y="140">0</text><text class="spd-tick" x="44" y="52">50</text><text class="spd-tick" x="112" y="16">100</text><text class="spd-tick" x="182" y="52">150</text><text class="spd-tick" x="212" y="140">200</text><path class="spd-bg" d="M20 120 A100 100 0 0 1 220 120"/><path class="spd-fg" id="spd_arc" stroke="url(#spdGrad)" d="M20 120 A100 100 0 0 1 220 120"/></svg><div class="spd-center"><div id="spd_speed">0.00</div><div id="spd_unit">km/h</div><div class="spd-src">Source: <span id="spd_src">—</span></div><div><span class="spd-acc-pill" id="spd_accpill">GPS —</span></div></div></div></div>
  <div id="spd_over" class="spd-over" style="display:none">⚠ Speed limit se upar! <span id="spd_over_v"></span></div>
- <div class="kp">${kp('Max speed','<span id="spd_max">0 km/h</span>')}${kp('Average','<span id="spd_avg">0 km/h</span>')}${kp('Moving avg','<span id="spd_mavg">0 km/h</span>')}${kp('Distance','<span id="spd_dist">0.00 km</span>')}${kp('Trip time','<span id="spd_time">00:00</span>')}${kp('Moving time','<span id="spd_moving">00:00</span>')}</div>
+ <div class="kp">${kp('Max speed','<span id="spd_max">0.00 km/h</span>')}${kp('Average','<span id="spd_avg">0.00 km/h</span>')}${kp('Moving avg','<span id="spd_mavg">0.00 km/h</span>')}${kp('Distance','<span id="spd_dist">0.00 km</span>')}${kp('Trip time','<span id="spd_time">00:00</span>')}${kp('Moving time','<span id="spd_moving">00:00</span>')}</div>
  <div class="row"><button id="spd_go" onclick="spdToggle()">▶ Start</button><button class="g" onclick="spdReset()">Reset</button><button class="g" id="spd_unitBtn" onclick="spdCycleUnit()">km/h</button></div>
  <p class="mu" id="spd_status" style="text-align:center">Start dabao aur location permission Allow karo</p>
  <h3>Live GPS values — asli reading</h3>
- <div class="kp">${kp('Altitude','<span id="spd_alt">—</span>')}${kp('Heading','<span id="spd_head">—</span>')}${kp('GPS accuracy','<span id="spd_acc">—</span>')}${kp('Signal','<span id="spd_sig">—</span>')}${kp('Latitude','<span id="spd_lat">—</span>')}${kp('Longitude','<span id="spd_lon">—</span>')}${kp('GPS fixes','<span id="spd_fixes">0</span>')}${kp('Odometer (total)','<span id="spd_odo">0.00 km</span>')}${kp('Last update','<span id="spd_upd">—</span>')}</div>
+ <div class="kp">${kp('Altitude','<span id="spd_alt">—</span>')}${kp('Heading','<span id="spd_head">—</span>')}${kp('GPS accuracy','<span id="spd_acc">—</span>')}${kp('Speed accuracy','<span id="spd_spdacc">—</span>')}${kp('Signal','<span id="spd_sig">—</span>')}${kp('Latitude','<span id="spd_lat">—</span>')}${kp('Longitude','<span id="spd_lon">—</span>')}${kp('GPS fixes','<span id="spd_fixes">0</span>')}${kp('Odometer (total)','<span id="spd_odo">0.00 km</span>')}${kp('Last update','<span id="spd_upd">—</span>')}</div>
  <h3>Settings</h3>
  <div class="grid"><label>Speed limit (<span id="spd_lim_u">km/h</span>)<input id="spd_limit" type="number" inputmode="numeric" value="80" onchange="spdSetLimit(this.value)"></label><label style="display:flex;gap:8px;align-items:center;margin-top:22px"><input type="checkbox" id="spd_vib" checked style="width:auto;margin:0" onchange="spdSetVib(this.checked)"> Overspeed pe vibrate</label></div>
  <h3>Trip history</h3>
