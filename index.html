@@ -867,7 +867,7 @@ const spdTrips=()=>{try{const t=JSON.parse(localStorage.getItem(SPD_KEY+'_trips'
 const spdSaveTrips=t=>{try{localStorage.setItem(SPD_KEY+'_trips',JSON.stringify(t.slice(0,20)))}catch(x){}};
 const spdOdo=()=>{try{return +localStorage.getItem(SPD_KEY+'_odo')||0}catch(x){return 0}};
 const spdSaveOdo=v=>{try{localStorage.setItem(SPD_KEY+'_odo',String(Math.round(v)))}catch(x){}};
-function spdNew(){const c=spdLoad();return{ui:(c.ui==null?0:+c.ui)||0,limitKmh:(c.limitKmh==null?80:+c.limitKmh)||80,vib:c.vib!==false,watchId:null,timer:null,wake:null,last:null,maxMs:0,distM:0,startT:null,movingSec:0,curMs:0,smooth:0,fixes:0,acc:null,alt:null,altAcc:null,head:null,lat:null,lon:null,src:'—',lastFixT:null,over:false,running:false,saved:false}}
+function spdNew(){const c=spdLoad();return{ui:(c.ui==null?0:+c.ui)||0,limitKmh:(c.limitKmh==null?80:+c.limitKmh)||80,vib:c.vib!==false,watchId:null,timer:null,wake:null,last:null,maxMs:0,distM:0,startT:null,movingSec:0,curMs:0,smooth:0,fixes:0,acc:null,alt:null,altAcc:null,head:null,lat:null,lon:null,src:'—',lastFixT:null,over:false,running:false,saved:false,lowAcc:false}}
 function spdFmt(s){s=Math.floor(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>(n<10?'0':'')+n;return (h?h+':':'')+p(m)+':'+p(x)}
 function spdHav(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lon-a.lon),h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)*Math.sin(dLo/2);return 2*R*Math.asin(Math.sqrt(h))}
 function spdRender(){
@@ -910,9 +910,9 @@ function spdPos(p){
  const c=p.coords,now=p.timestamp||Date.now();
  const cur={lat:c.latitude,lon:c.longitude,t:now,acc:c.accuracy};
  let ms=null;
- if(typeof c.speed=='number'&&!isNaN(c.speed)&&c.speed>=0){ms=c.speed;SPD.src='GPS'}
+ if(typeof c.speed=='number'&&!isNaN(c.speed)&&c.speed>=0){ms=c.speed;SPD.src=SPD.lowAcc?'Network':'GPS'}
  else if(SPD.last&&cur.acc<=40){const dt=(now-SPD.last.t)/1000;if(dt>0.5){ms=spdHav(SPD.last,cur)/dt;SPD.src='Calculated'}}
- if(ms===null){ms=0;SPD.src='GPS'}
+ if(ms===null){ms=0;SPD.src=SPD.lowAcc?'Network':'GPS'}
  if(ms*3.6<1.5)ms=0;
  SPD.smooth=SPD.smooth*0.4+ms*0.6;
  SPD.curMs=SPD.smooth<0.3?0:SPD.smooth;
@@ -932,7 +932,12 @@ function spdPos(p){
 }
 function spdErr(er){
  if(!SPD)return;
- const m={1:'Location permission block hai. Browser settings me Allow karo.',2:'GPS signal nahi mil raha. Khule aasman me try karo.',3:'GPS time out ho gaya. Dobara try karo.'};
+ if(er.code===3&&SPD.fixes===0&&!SPD.lowAcc){
+  spdWatch(false);
+  const st=spdEl('spd_status');if(st)st.textContent='GPS (satellite) fix nahi mil raha — network location se dikha rahe hain (accuracy kam hogi). Khule aasman me jaao to GPS fix mil jayega.';
+  return;
+ }
+ const m={1:'Location permission block hai. Browser settings me Allow karo.',2:'GPS signal nahi mil raha. Khule aasman me try karo.',3:'GPS time out ho gaya. Khule aasman me jaake Stop → Start dabao.'};
  const st=spdEl('spd_status');if(st)st.textContent=m[er.code]||'GPS error';
 }
 async function spdWake(){try{if('wakeLock' in navigator)SPD.wake=await navigator.wakeLock.request('screen')}catch(x){}}
@@ -943,17 +948,22 @@ function spdSyncBtns(){
  else{b.textContent='▶ Start';b.style.background=''}
 }
 function spdToggle(){if(!SPD)SPD=spdNew();SPD.running?spdStop():spdStart()}
+function spdWatch(high){
+ if(SPD.watchId!==null){try{navigator.geolocation.clearWatch(SPD.watchId)}catch(x){}SPD.watchId=null}
+ SPD.lowAcc=!high;
+ SPD.watchId=navigator.geolocation.watchPosition(spdPos,spdErr,{enableHighAccuracy:high,maximumAge:0,timeout:high?60000:30000});
+}
 function spdStart(){
  if(!SPD)SPD=spdNew();
  if(SPD.running)return;
  if(!navigator.geolocation){const st=spdEl('spd_status');if(st)st.textContent='Is browser me GPS support nahi hai';return}
  if(SPD.saved){SPD.maxMs=0;SPD.distM=0;SPD.movingSec=0;SPD.fixes=0;SPD.startT=null;SPD.saved=false}
  SPD.startT=SPD.startT||Date.now();
- SPD.running=true;SPD.over=false;
- SPD.watchId=navigator.geolocation.watchPosition(spdPos,spdErr,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+ SPD.running=true;SPD.over=false;SPD.lowAcc=false;
+ spdWatch(true);
  SPD.timer=setInterval(spdRender,1000);
  spdWake();
- const st=spdEl('spd_status');if(st)st.textContent='GPS dhundh raha hai...';
+ const st=spdEl('spd_status');if(st)st.textContent='GPS fix dhundh rahe hain — pehli baar 1 minute tak lag sakta hai, khule aasman me raho';
  spdSyncBtns();
 }
 function spdSaveTrip(){
@@ -982,7 +992,7 @@ function spdStop(){
 function spdReset(){
  if(!SPD)SPD=spdNew();
  spdStop();
- SPD.maxMs=0;SPD.distM=0;SPD.movingSec=0;SPD.fixes=0;SPD.curMs=0;SPD.smooth=0;SPD.startT=null;SPD.saved=false;SPD.over=false;SPD.acc=null;SPD.alt=null;SPD.head=null;SPD.lat=null;SPD.lon=null;SPD.lastFixT=null;SPD.src='—';
+ SPD.maxMs=0;SPD.distM=0;SPD.movingSec=0;SPD.fixes=0;SPD.curMs=0;SPD.smooth=0;SPD.startT=null;SPD.saved=false;SPD.over=false;SPD.lowAcc=false;SPD.acc=null;SPD.alt=null;SPD.head=null;SPD.lat=null;SPD.lon=null;SPD.lastFixT=null;SPD.src='—';
  const st=spdEl('spd_status');if(st)st.textContent='Reset ho gaya — Start dabao';
  spdRender();spdSyncBtns();
 }
